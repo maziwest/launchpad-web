@@ -166,7 +166,7 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "new" | "graduation" | "mine">("all");
+  const [filter, setFilter] = useState<"all" | "new" | "graduation" | "mine" | "volume">("all");
   const [tokenImages, setTokenImages] = useState<Map<string, string>>(new Map());
   const [tokenSocials, setTokenSocials] = useState<Map<string, { twitter?: string; telegram?: string; website?: string }>>(new Map());
   useEffect(() => {
@@ -360,6 +360,10 @@ export default function App() {
     .filter((c) => filter !== "mine" || (!!wallet.publicKey && c.creator.equals(wallet.publicKey)))
     .sort((a, b) => {
       if (filter === "new") return b.createdAt - a.createdAt;
+      if (filter === "volume") {
+        const usd = (c: OnChainCoin) => (c.volume24hQuote ?? 0) * (c.quoteUsdPrice ?? solUsdPrice ?? 0);
+        return usd(b) - usd(a);
+      }
       return Number(b.quoteReserveLamports) - Number(a.quoteReserveLamports);
     });
 
@@ -937,9 +941,9 @@ export default function App() {
               </div>
               <div className="sort-group">
                 Sort
-                <span className={`pill${filter !== "new" ? " active" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFilter("all")}>Market cap</span>
+                <span className={`pill${filter !== "new" && filter !== "volume" ? " active" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFilter("all")}>Market cap</span>
                 <span className={`pill${filter === "new" ? " active" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFilter("new")}>Newest</span>
-                <span className="pill">24h volume</span>
+                <span className={`pill${filter === "volume" ? " active" : ""}`} style={{ cursor: "pointer" }} onClick={() => setFilter("volume")}>24h volume</span>
               </div>
             </div>
             <div className="pair-row">
