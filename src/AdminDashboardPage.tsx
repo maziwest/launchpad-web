@@ -1,3 +1,4 @@
+import { fetchVerifiedMintsFromApi, setCoinVerifiedApi } from "./lib/program-dbc";
 import React, { useCallback, useEffect, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
@@ -387,7 +388,9 @@ export default function AdminDashboardPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    setVerified(getVerifiedTokens());
+    fetchVerifiedMintsFromApi()
+      .then(setVerified)
+      .catch((err) => console.error("Failed to load verified list:", err));
   }, []);
 
   const loadCoins = useCallback(async () => {
@@ -417,10 +420,25 @@ export default function AdminDashboardPage() {
     }
   }
 
-  function toggleVerified(mint: string) {
+  async function toggleVerified(mint: string) {
     if (!isAdmin) return;
-    setTokenVerified(mint, !verified.has(mint));
-    setVerified(getVerifiedTokens());
+    const token = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (!token) {
+      alert("Admin session expired, log in again.");
+      return;
+    }
+    const next = !verified.has(mint);
+    try {
+      await setCoinVerifiedApi(mint, next, token);
+      setVerified((prev) => {
+        const updated = new Set(prev);
+        if (next) updated.add(mint);
+        else updated.delete(mint);
+        return updated;
+      });
+    } catch (err: any) {
+      alert(`Could not update verification: ${err?.message ?? err}`);
+    }
   }
 
   const filteredCoins = coins.filter((c) => {
