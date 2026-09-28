@@ -9,3 +9,5 @@ id.json
 *.key
 *.log
 .DS_Store
+*.swp
+*.swo
