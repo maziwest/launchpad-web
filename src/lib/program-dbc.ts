@@ -163,12 +163,15 @@ export async function fetchAllCoins(connection: Connection): Promise<OnChainCoin
     pools.map(async ({ publicKey, account }) => {
       const p = (account as any).poolState;
       const mint = new PublicKey(p.baseMint);
-      const priceDecimal = getPriceFromSqrtPrice(p.sqrtPrice, TokenDecimal.SIX, TokenDecimal.NINE);
       const [meta, poolConfig] = await Promise.all([
         fetchTokenMetadata(connection, mint),
         client.state.getPoolConfig(new PublicKey(p.config)),
       ]);
       const migrationThresholdLamports = BigInt(new BN((poolConfig as any).migrationQuoteThreshold).toString());
+      // Real quote asset + decimals for this pool (SOL = 9, SPCX = 6, ...), not assumed
+      const quoteMint = new PublicKey((poolConfig as any).quoteMint);
+      const quoteDecimals = await fetchQuoteMintDecimals(connection, quoteMint);
+      const priceDecimal = getPriceFromSqrtPrice(p.sqrtPrice, TokenDecimal.SIX, quoteDecimals as any);
       return {
         poolAddress: publicKey,
         mint,
@@ -179,8 +182,8 @@ export async function fetchAllCoins(connection: Connection): Promise<OnChainCoin
         quoteReserveLamports: BigInt(new BN(p.quoteReserve).toString()),
         migrationThresholdLamports,
         priceInSol: Number(priceDecimal.toString()),
-        quoteMint: QUOTE_MINT,
-        quoteDecimals: 9,
+        quoteMint,
+        quoteDecimals,
         complete: Boolean(p.hasSwap) && new BN(p.quoteReserve).gte(new BN(migrationThresholdLamports.toString())),
         migrated: Boolean(p.isMigrated),
         createdAt: new BN(p.activationPoint).toNumber(),
@@ -687,20 +690,20 @@ export async function fetchPoolEvents(connection: Connection, poolAddress: Publi
   return events;
 }
 
-export function tradesFromEvents(events: RawPoolEvent[]): TradeEvent[] {
+export function tradesFromEvents(events: RawPoolEvent[], quoteDecimals = 9): TradeEvent[] {
   return events
     .filter((e) => e.name === "evtSwap2")
     .map((e) => {
       const data = e.data;
       const isBuy = data.tradeDirection === 1; // QuoteToBase = paying SOL to receive the coin
-      const priceDecimal = getPriceFromSqrtPrice(data.swapResult.nextSqrtPrice, TokenDecimal.SIX, TokenDecimal.NINE);
+      const priceDecimal = getPriceFromSqrtPrice(data.swapResult.nextSqrtPrice, TokenDecimal.SIX, quoteDecimals as any);
       return {
         signature: e.signature,
         timestamp: Number(data.currentTimestamp.toString()),
         isBuy,
         solAmount: isBuy
-          ? Number(data.swapParameters.amount0.toString()) / LAMPORTS_PER_SOL
-          : Number(data.swapResult.outputAmount.toString()) / LAMPORTS_PER_SOL,
+          ? Number(data.swapParameters.amount0.toString()) / 10 ** quoteDecimals
+          : Number(data.swapResult.outputAmount.toString()) / 10 ** quoteDecimals,
         tokenAmount: isBuy
           ? Number(data.swapResult.outputAmount.toString()) / 10 ** 6
           : Number(data.swapParameters.amount0.toString()) / 10 ** 6,
@@ -742,9 +745,9 @@ export function totalClaimedLamports(claims: ClaimEvent[]): bigint {
   return claims.reduce((sum, c) => sum + c.quoteAmountLamports, 0n);
 }
 
-export async function fetchTradeHistory(connection: Connection, poolAddress: PublicKey, limit = 20): Promise<TradeEvent[]> {
+export async function fetchTradeHistory(connection: Connection, poolAddress: PublicKey, limit = 20, quoteDecimals = 9): Promise<TradeEvent[]> {
   const events = await fetchPoolEvents(connection, poolAddress, limit);
-  return tradesFromEvents(events);
+  return tradesFromEvents(events, quoteDecimals);
 }
 
 export async function fetchClaimHistory(connection: Connection, poolAddress: PublicKey, limit = 20): Promise<ClaimEvent[]> {
@@ -756,10 +759,11 @@ export async function fetchClaimHistory(connection: Connection, poolAddress: Pub
 export async function fetchTradesAndClaims(
   connection: Connection,
   poolAddress: PublicKey,
-  limit = 20
+  limit = 20,
+  quoteDecimals = 9
 ): Promise<{ trades: TradeEvent[]; claims: ClaimEvent[] }> {
   const events = await fetchPoolEvents(connection, poolAddress, limit);
-  return { trades: tradesFromEvents(events), claims: claimsFromEvents(events) };
+  return { trades: tradesFromEvents(events, quoteDecimals), claims: claimsFromEvents(events) };
 }
 
 export interface Candle {
@@ -851,7 +855,7 @@ export async function fetchDashboardStats(connection: Connection, coins: OnChain
   await mapWithConcurrency(coins, 5, async (coin) => {
     try {
       const events = await fetchPoolEvents(connection, coin.poolAddress, eventsPerPoolLimit);
-      for (const t of tradesFromEvents(events)) {
+      for (const t of tradesFromEvents(events, coin.quoteDecimals ?? 9)) {
         const lamports = BigInt(Math.round(t.solAmount * LAMPORTS_PER_SOL));
         totalVolumeLamports += lamports;
         if (t.timestamp >= dayAgo) volume24hLamports += lamports;

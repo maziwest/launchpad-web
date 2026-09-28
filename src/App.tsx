@@ -559,9 +559,12 @@ export default function App() {
     setTradesShown(10);
     setLastClaim(null);
     let dammPool: PublicKey | null = null;
+    let dammBaseDecimals = 6;
+    let dammQuoteDecimals = 9;
     const migrated = selected.migrated;
     const poolAddress = selected.poolAddress;
     const mint = selected.mint;
+    const quoteDecimals = selected.quoteDecimals ?? 9;
 
     // Adds only trades we haven't seen, newest first
     const merge = (incoming: AnyTradeEvent[]) => {
@@ -578,8 +581,10 @@ export default function App() {
           const pool = await fetchDammPool(connection, mint);
           if (!pool) return null;
           dammPool = pool.poolAddress;
+          dammBaseDecimals = pool.baseDecimals;
+          dammQuoteDecimals = pool.quoteDecimals;
         }
-        const dammTrades = await fetchDammTradeHistory(connection, dammPool!, limit);
+        const dammTrades = await fetchDammTradeHistory(connection, dammPool!, limit, dammBaseDecimals, dammQuoteDecimals);
         if (limit < 50) return dammTrades; // live polls only need the newest DAMM trades
         // Graduated coins keep their bonding-curve history too, so the chart shows the full life
         let curveTrades: AnyTradeEvent[] = [];
@@ -607,7 +612,7 @@ export default function App() {
           console.error("Trades API unavailable, falling back to chain:", err);
         }
       }
-      const { trades: t, claims } = await fetchTradesAndClaims(connection, poolAddress, limit);
+      const { trades: t, claims } = await fetchTradesAndClaims(connection, poolAddress, limit, quoteDecimals);
       if (limit >= 50 && !cancelled) setTotalClaimedSol(Number(totalClaimedLamports(claims)) / LAMPORTS_PER_SOL);
       return t;
     };

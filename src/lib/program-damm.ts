@@ -1,11 +1,26 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { Connection, PublicKey } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, getMint } from "@solana/spl-token";
 import { CpAmm, SwapMode, getPriceFromSqrtPrice, cpAmmCoder, CP_AMM_PROGRAM_ID, getUnClaimLpFee } from "@meteora-ag/cp-amm-sdk";
 import BN from "bn.js";
 import bs58 from "bs58";
 
 const LAMPORTS_PER_SOL = 1_000_000_000;
+
+const mintInfoCache = new Map<string, { decimals: number; programId: PublicKey }>();
+/** Real decimals + token program (standard or Token-2022) for a mint, read on-chain once and cached. */
+async function fetchMintInfo(connection: Connection, mint: PublicKey) {
+  const key = mint.toBase58();
+  const hit = mintInfoCache.get(key);
+  if (hit) return hit;
+  const acc = await connection.getAccountInfo(mint);
+  if (!acc) throw new Error(`Mint ${key} not found on-chain`);
+  const programId = acc.owner.equals(TOKEN_2022_PROGRAM_ID) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+  const m = await getMint(connection, mint, "confirmed", programId);
+  const info = { decimals: m.decimals, programId };
+  mintInfoCache.set(key, info);
+  return info;
+}
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,7 +70,7 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, task: (item: 
   return results;
 }
 
-export async function fetchDammTradeHistory(connection: Connection, poolAddress: PublicKey, limit = 20): Promise<TradeEvent[]> {
+export async function fetchDammTradeHistory(connection: Connection, poolAddress: PublicKey, limit = 20, baseDecimals = 6, quoteDecimals = 9): Promise<TradeEvent[]> {
   const signatures = await connection.getSignaturesForAddress(poolAddress, { limit });
 
   const perTxTrades = await mapWithConcurrency(signatures, 8, async (sigInfo) => {
@@ -78,17 +93,17 @@ export async function fetchDammTradeHistory(connection: Connection, poolAddress:
 
         const data: any = decoded.data;
         const isBuy = data.trade_direction === 1; // BtoA: paying SOL (B) to receive the coin (A)
-        const priceDecimal = getPriceFromSqrtPrice(data.swap_result.next_sqrt_price, 6, 9);
+        const priceDecimal = getPriceFromSqrtPrice(data.swap_result.next_sqrt_price, baseDecimals, quoteDecimals);
         found.push({
           signature: sigInfo.signature,
           timestamp: Number(data.current_timestamp.toString()),
           isBuy,
           solAmount: isBuy
-            ? Number(data.params.amount_0.toString()) / LAMPORTS_PER_SOL
-            : Number(data.swap_result.output_amount.toString()) / LAMPORTS_PER_SOL,
+            ? Number(data.params.amount_0.toString()) / 10 ** quoteDecimals
+            : Number(data.swap_result.output_amount.toString()) / 10 ** quoteDecimals,
           tokenAmount: isBuy
-            ? Number(data.swap_result.output_amount.toString()) / 10 ** 6
-            : Number(data.params.amount_0.toString()) / 10 ** 6,
+            ? Number(data.swap_result.output_amount.toString()) / 10 ** baseDecimals
+            : Number(data.params.amount_0.toString()) / 10 ** baseDecimals,
           priceInSol: Number(priceDecimal.toString()),
           trader,
         });
@@ -151,8 +166,8 @@ export async function claimDammPositionFee(
     tokenBMint: pool.tokenBMint,
     tokenAVault: pool.tokenAVault,
     tokenBVault: pool.tokenBVault,
-    tokenAProgram: TOKEN_PROGRAM_ID,
-    tokenBProgram: TOKEN_PROGRAM_ID,
+    tokenAProgram: pool.tokenAProgram,
+    tokenBProgram: pool.tokenBProgram,
     receiver: wallet.publicKey,
   });
   return finalizeAndSend(connection, wallet, tx);
@@ -182,6 +197,10 @@ export interface DammPool {
   tokenBMint: PublicKey; // SOL (wrapped)
   tokenAVault: PublicKey;
   tokenBVault: PublicKey;
+  baseDecimals: number; // real, read from the coin's mint
+  quoteDecimals: number; // real, read from the quote mint (SOL = 9, SPCX = 6, ...)
+  tokenAProgram: PublicKey; // standard token program or Token-2022, read on-chain
+  tokenBProgram: PublicKey;
   priceInSol: number; // real, current price — read live from the pool's own sqrtPrice
   poolState: any; // raw PoolState, passed straight back into quote/swap calls
 }
@@ -195,9 +214,17 @@ export async function fetchDammPool(connection: Connection, mint: PublicKey): Pr
   const results = await client.fetchPoolStatesByTokenMint(mint);
   if (!results || results.length === 0) return null;
   const { publicKey, account } = results[0];
-  const priceDecimal = getPriceFromSqrtPrice(account.sqrtPrice, 6, 9);
+  const [a, b] = await Promise.all([
+    fetchMintInfo(connection, new PublicKey(account.tokenAMint)),
+    fetchMintInfo(connection, new PublicKey(account.tokenBMint)),
+  ]);
+  const priceDecimal = getPriceFromSqrtPrice(account.sqrtPrice, a.decimals, b.decimals);
   return {
     poolAddress: publicKey,
+    baseDecimals: a.decimals,
+    quoteDecimals: b.decimals,
+    tokenAProgram: a.programId,
+    tokenBProgram: b.programId,
     tokenAMint: new PublicKey(account.tokenAMint),
     tokenBMint: new PublicKey(account.tokenBMint),
     tokenAVault: new PublicKey(account.tokenAVault),
@@ -225,8 +252,8 @@ export async function quoteDammTrade(
     slippage: slippageBps / 100, // SDK takes a percentage (e.g. 1 = 1%), we track bps
     currentPoint: new BN(Math.floor(Date.now() / 1000)),
     poolState: pool.poolState,
-    tokenADecimal: 6, // our coins are always minted with 6 decimals
-    tokenBDecimal: 9, // SOL
+    tokenADecimal: pool.baseDecimals,
+    tokenBDecimal: pool.quoteDecimals,
     hasReferral: false,
     swapMode: SwapMode.ExactIn,
     amountIn: new BN(amountInLamports.toString()),
@@ -254,8 +281,8 @@ async function dammSwap(
     tokenBMint: pool.tokenBMint,
     tokenAVault: pool.tokenAVault,
     tokenBVault: pool.tokenBVault,
-    tokenAProgram: TOKEN_PROGRAM_ID,
-    tokenBProgram: TOKEN_PROGRAM_ID,
+    tokenAProgram: pool.tokenAProgram,
+    tokenBProgram: pool.tokenBProgram,
     referralTokenAccount: null,
     poolState: pool.poolState,
     swapMode: SwapMode.ExactIn,
