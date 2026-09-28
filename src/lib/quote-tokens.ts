@@ -16,7 +16,7 @@ export interface QuoteTokenOption {
   symbol: string;
   displayName: string;
   decimals: number;
-  category: "Solana" | "Sunrise" | "xStocks" | "Currencies";
+  category: "Solana" | "Sunrise" | "xStocks" | "Tessera Lab" | "Custom" | "Currencies";
   imageUrl?: string; // real logo for this quote asset, when we have one
 }
 
@@ -45,3 +45,6 @@ export function getQuoteTokenByMint(mint: PublicKey): QuoteTokenOption | undefin
 }
 
 export const DEFAULT_QUOTE_TOKEN = QUOTE_TOKEN_OPTIONS[0]; // SOL
+
+/** Pairing sources shown as filter chips on the homepage, in order. */
+export const PAIR_CATEGORIES: QuoteTokenOption["category"][] = ["Solana", "Sunrise", "xStocks", "Tessera Lab", "Custom"];

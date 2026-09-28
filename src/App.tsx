@@ -1,3 +1,4 @@
+import { PAIR_CATEGORIES } from "./lib/quote-tokens";
 import { fetchTradesFromApi, fetchClaimsFromApi } from "./lib/program-dbc";
 import React, { useCallback, useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
@@ -167,6 +168,51 @@ export default function App() {
   }, []);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "new" | "graduation" | "mine" | "volume">("all");
+  const [pairCat, setPairCat] = useState<string>("All");
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customSearch, setCustomSearch] = useState("");
+  const [customQuote, setCustomQuote] = useState<string | null>(null);
+  const [customQuoteSymbol, setCustomQuoteSymbol] = useState("");
+  const [customTokens, setCustomTokens] = useState<{ mint: string; symbol: string; name: string; icon: string }[]>([]);
+  const [customLoading, setCustomLoading] = useState(false);
+  const [customPos, setCustomPos] = useState({ top: 0, left: 0 });
+  useEffect(() => {
+    if (!customOpen) return;
+    const close = () => setCustomOpen(false);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [customOpen]);
+  useEffect(() => {
+    if (!customOpen) return;
+    const q = customSearch.trim();
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      setCustomLoading(true);
+      try {
+        const url = q
+          ? `https://lite-api.jup.ag/tokens/v2/search?query=${encodeURIComponent(q)}`
+          : "https://lite-api.jup.ag/tokens/v2/toptrending/24h?limit=30";
+        const res = await fetch(url);
+        const rows: any[] = res.ok ? await res.json() : [];
+        if (!cancelled)
+          setCustomTokens(
+            rows.filter((r) => r?.id && r?.symbol).map((r) => ({ mint: r.id, symbol: r.symbol, name: r.name ?? "", icon: r.icon ?? "" }))
+          );
+      } catch {
+        if (!cancelled) setCustomTokens([]);
+      } finally {
+        if (!cancelled) setCustomLoading(false);
+      }
+    }, q ? 300 : 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [customOpen, customSearch]);
   const [tokenImages, setTokenImages] = useState<Map<string, string>>(new Map());
   const [tokenSocials, setTokenSocials] = useState<Map<string, { twitter?: string; telegram?: string; website?: string }>>(new Map());
   useEffect(() => {
@@ -357,6 +403,8 @@ export default function App() {
         c.mint.toBase58().toLowerCase().includes(q)
       );
     })
+    .filter((c) => pairCat === "All" || (getQuoteTokenByMint(c.quoteMint)?.category ?? "Custom") === pairCat)
+    .filter((c) => pairCat !== "Custom" || !customQuote || c.quoteMint.toBase58() === customQuote)
     .filter((c) => filter !== "mine" || (!!wallet.publicKey && c.creator.equals(wallet.publicKey)))
     .sort((a, b) => {
       if (filter === "new") return b.createdAt - a.createdAt;
@@ -947,18 +995,115 @@ export default function App() {
               </div>
             </div>
             <div className="pair-row">
-              <span className="chip active">All</span>
-              <span className="chip">SOL</span>
-              <span className="chip">USDC</span>
-              <span className="chip">Stocks</span>
-              <span className="chip">Currencies</span>
-              <span className="chip">Commodities</span>
-              <div className="chip-dropdown">
-                <button className="chip dropdown-chip" type="button">
-                  <span className="dropdown-label">Custom</span>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M6 9l6 6 6-6"/></svg>
-                </button>
-              </div>
+              {["All", ...PAIR_CATEGORIES].map((cat) =>
+                cat !== "Custom" ? (
+                  <span
+                    key={cat}
+                    className={`chip${pairCat === cat ? " active" : ""}`}
+                    style={{ cursor: "pointer" }}
+                    onClick={() => { setPairCat(cat); setCustomQuote(null); setCustomOpen(false); }}
+                  >
+                    {cat}
+                  </span>
+                ) : (
+                  <span key={cat} style={{ position: "relative", display: "inline-block" }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setCustomPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 278)) });
+                        setPairCat("Custom");
+                        setCustomOpen((o) => !o);
+                      }}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 10,
+                        font: "inherit", fontSize: 14, cursor: "pointer", color: "#D6E4E6",
+                        background: pairCat === "Custom" ? "rgba(110,175,185,0.22)" : "rgba(110,175,185,0.12)",
+                        border: "1px solid rgba(130,195,205,0.35)", position: "relative", zIndex: 51,
+                      }}
+                    >
+                      {customQuote && customQuoteSymbol ? customQuoteSymbol : "Custom"}
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                        style={{ transform: customOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }}>
+                        <path d="M6 9l6 6 6-6"/>
+                      </svg>
+                    </button>
+                    {customOpen && (() => {
+                      const q = customSearch.trim().toLowerCase();
+                      // Custom quote tokens already used on Minti Q come first
+                      const onPlatform = new Map<string, { mint: string; symbol: string; name: string; icon: string }>();
+                      for (const c of coins) {
+                        if (getQuoteTokenByMint(c.quoteMint)) continue;
+                        const mint = c.quoteMint.toBase58();
+                        const symbol = quoteSymbolFor(c);
+                        if (!onPlatform.has(mint) && (!q || symbol.toLowerCase().includes(q) || mint.toLowerCase().includes(q)))
+                          onPlatform.set(mint, { mint, symbol, name: "On Minti Q", icon: "" });
+                      }
+                      const list = [...onPlatform.values()];
+                      for (const t of customTokens) {
+                        if (onPlatform.has(t.mint)) continue;
+                        let inRegistry = false;
+                        try { inRegistry = !!getQuoteTokenByMint(new PublicKey(t.mint)); } catch {}
+                        if (!inRegistry) list.push(t);
+                      }
+                      const rowBase = { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, cursor: "pointer" } as const;
+                      return (
+                        <>
+                          <div onClick={() => setCustomOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 49 }} />
+                          <div style={{
+                            position: "fixed", top: customPos.top, left: customPos.left, zIndex: 50, width: 270,
+                            background: "#0E1618", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14,
+                            padding: 8, boxShadow: "0 16px 40px rgba(0,0,0,0.55)",
+                          }}>
+                            <input
+                              autoFocus
+                              value={customSearch}
+                              onChange={(e) => setCustomSearch(e.target.value)}
+                              placeholder="Search name, ticker or CA"
+                              style={{
+                                width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10,
+                                border: "1px solid rgba(255,255,255,0.12)", background: "#0B0F0E", color: "inherit",
+                                font: "inherit", fontSize: 14, outline: "none",
+                              }}
+                            />
+                            <div style={{ marginTop: 8, maxHeight: 300, overflowY: "auto" }}>
+                              <div
+                                onClick={() => { setCustomQuote(null); setCustomQuoteSymbol(""); setCustomOpen(false); }}
+                                style={{ ...rowBase, fontWeight: 600, background: !customQuote ? "rgba(110,175,185,0.2)" : "transparent" }}
+                              >
+                                All Custom
+                              </div>
+                              {list.map((t) => (
+                                <div
+                                  key={t.mint}
+                                  onClick={() => { setCustomQuote(t.mint); setCustomQuoteSymbol(t.symbol); setPairCat("Custom"); setCustomOpen(false); }}
+                                  style={{ ...rowBase, background: customQuote === t.mint ? "rgba(53,214,140,0.1)" : "transparent" }}
+                                >
+                                  {t.icon ? (
+                                    <img src={t.icon} alt="" width={28} height={28} style={{ borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                                  ) : (
+                                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+                                  )}
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontWeight: 700, fontSize: 14 }}>{t.symbol}</div>
+                                    <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</div>
+                                  </div>
+                                </div>
+                              ))}
+                              {customLoading && list.length === 0 && (
+                                <div style={{ ...rowBase, cursor: "default", opacity: 0.6, fontSize: 13 }}>Searching...</div>
+                              )}
+                              {!customLoading && list.length === 0 && (
+                                <div style={{ ...rowBase, cursor: "default", opacity: 0.6, fontSize: 13 }}>No tokens found</div>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </span>
+                )
+              )}
             </div>
           </section>
 
