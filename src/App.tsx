@@ -250,6 +250,20 @@ export default function App() {
     return usdFmt.format(capUsd);
   }
 
+  function volLabel(coin: OnChainCoin): string {
+    const usdPrice = coin.quoteUsdPrice ?? solUsdPrice;
+    if (coin.volume24hQuote == null || usdPrice == null) return "—";
+    return usdFmt.format(coin.volume24hQuote * usdPrice);
+  }
+
+  function agoLabel(unixSeconds: number): string {
+    const diff = Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds);
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
+
   function walletFor() {
     return new AnchorProvider(connection, wallet as any, { commitment: "confirmed" }).wallet;
   }
@@ -465,6 +479,7 @@ export default function App() {
 
   const [trades, setTrades] = useState<AnyTradeEvent[]>([]);
   const [tradesShown, setTradesShown] = useState(10);
+  const [lastClaim, setLastClaim] = useState<{ amountLamports: bigint; timestamp?: number } | null>(null);
   const [candles, setCandles] = useState<ReturnType<typeof buildCandles>>([]);
   const [totalClaimedSol, setTotalClaimedSol] = useState(0);
   const [chartLoading, setChartLoading] = useState(false);
@@ -475,6 +490,7 @@ export default function App() {
     let inFlight = false;
     let current: AnyTradeEvent[] = [];
     setTradesShown(10);
+    setLastClaim(null);
     let dammPool: PublicKey | null = null;
     const migrated = selected.migrated;
     const poolAddress = selected.poolAddress;
@@ -505,7 +521,10 @@ export default function App() {
             fetchTradesFromApi(mint.toBase58()),
             fetchClaimsFromApi(mint.toBase58()),
           ]);
-          if (!cancelled) setTotalClaimedSol(Number(totalClaimedLamports(apiClaims)) / LAMPORTS_PER_SOL);
+          if (!cancelled) {
+            setTotalClaimedSol(Number(totalClaimedLamports(apiClaims)) / LAMPORTS_PER_SOL);
+            setLastClaim(apiClaims[0] ? { amountLamports: apiClaims[0].quoteAmountLamports, timestamp: apiClaims[0].timestamp } : null);
+          }
           return apiTrades;
         } catch (err) {
           console.error("Trades API unavailable, falling back to chain:", err);
@@ -986,7 +1005,7 @@ export default function App() {
                           <strong>{quoteSymbolFor(c)}</strong>
                           <span className="tg-badge">{quoteToken?.category ?? "Custom"}</span>
                         </div>
-                        <div className="tg-vol">Vol &mdash;</div>
+                        <div className="tg-vol">Vol {volLabel(c)}</div>
                       </div>
                       {isSol ? (
                         <div className="tg-visual tg-visual-solana">
@@ -1437,8 +1456,8 @@ export default function App() {
                 </div>
                 <div className="stat-pair">
                   <span className="stat-pair-label">Last payout</span>
-                  <span className="stat-pair-value">&mdash;</span>
-                  <span className="stat-pair-sub">paid in {quoteSym}</span>
+                  <span className="stat-pair-value">{lastClaim ? `${(Number(lastClaim.amountLamports) / 10 ** selected.quoteDecimals).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${quoteSym}` : "—"}</span>
+                  <span className="stat-pair-sub">{lastClaim?.timestamp ? agoLabel(lastClaim.timestamp) : `paid in ${quoteSym}`}</span>
                 </div>
               </div>
               <div className="royalty-wallet-row">

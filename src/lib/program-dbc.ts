@@ -144,6 +144,7 @@ export interface OnChainCoin {
   priceInSol: number; // real price, derived from sqrtPrice
   quoteMint: PublicKey; // real quote asset for this coin — SOL for most, a stock token for others
   quoteDecimals: number; // real decimals of quoteMint, read on-chain — never assumed
+  volume24hQuote?: number; // 24h traded volume in the quote asset, from our backend indexer
   quoteUsdPrice?: number; // real, live USD price of the quote asset, from our backend (Backpack's ticker API) — undefined when using a direct-RPC path that doesn't have this
   complete: boolean; // curve finished, awaiting migration
   migrated: boolean; // already graduated to the real DAMM v2 pool
@@ -712,6 +713,7 @@ export function tradesFromEvents(events: RawPoolEvent[]): TradeEvent[] {
 export interface ClaimEvent {
   signature: string;
   quoteAmountLamports: bigint; // real SOL amount claimed in this transaction
+  timestamp?: number; // unix seconds, when known (backend API provides it)
 }
 
 /** Every historical creator fee claim on this pool, decoded from real events. */
@@ -927,6 +929,7 @@ export async function fetchAllCoinsFromApi(): Promise<OnChainCoin[]> {
     quoteMint: new PublicKey(r.quote_mint),
     quoteDecimals: r.quote_decimals,
     quoteUsdPrice: r.quote_usd_price != null ? Number(r.quote_usd_price) : undefined,
+    volume24hQuote: r.volume_24h_raw != null ? Number(r.volume_24h_raw) / 10 ** (r.quote_decimals ?? 9) : undefined,
     complete: BigInt(r.quote_reserve_lamports) >= BigInt(r.migration_threshold_lamports),
     migrated: r.migrated,
     createdAt: Math.floor(new Date(r.created_at).getTime() / 1000),
@@ -1125,6 +1128,6 @@ export async function fetchTradesFromApi(mint: string): Promise<TradeEvent[]> {
 export async function fetchClaimsFromApi(mint: string): Promise<ClaimEvent[]> {
   const res = await fetch(`${API_BASE_URL}/coins/${mint}/claims`);
   if (!res.ok) throw new Error(`claims API ${res.status}`);
-  const rows: { signature: string; quoteAmountLamports: string }[] = await res.json();
-  return rows.map((r) => ({ signature: r.signature, quoteAmountLamports: BigInt(r.quoteAmountLamports) }));
+  const rows: { signature: string; quoteAmountLamports: string; timestamp: number }[] = await res.json();
+  return rows.map((r) => ({ signature: r.signature, quoteAmountLamports: BigInt(r.quoteAmountLamports), timestamp: r.timestamp }));
 }
