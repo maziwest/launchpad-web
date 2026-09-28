@@ -223,6 +223,15 @@ export default function App() {
       .catch((err) => console.error("Couldn't measure real launch cost:", err));
   }, [coins.length > 0, connection]);
 
+  // Hero card: official $MQ token, live data
+  const MQ_MINT = "7DTLTsUpAYpvR1CuPmYddWuCPyjik4MVR8WJ1rM5cfMy";
+  const mqCoin = coins.find((c) => c.mint.toBase58() === MQ_MINT);
+  const mqCurveLabel = !mqCoin
+    ? ""
+    : mqCoin.migrated
+    ? "Graduated"
+    : `${Math.floor(Math.min(100, (Number(mqCoin.quoteReserveLamports) / Math.max(1, Number(mqCoin.migrationThresholdLamports))) * 100))}% to grad`;
+
   function marketCapLabel(coin: OnChainCoin): string {
     // Prefer the coin's own real quote-asset USD price (from our backend,
     // correct for SOL, SPCX, or any future quote) over the global SOL
@@ -776,17 +785,25 @@ export default function App() {
                     </animateMotion>
                   </circle>
                 </svg>
-                <div className="float-card">
+                <div
+                  className="float-card"
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: "pointer" }}
+                  title="View $MQ"
+                  onClick={() => openCoin(MQ_MINT)}
+                  onKeyDown={(e) => { if (e.key === "Enter") openCoin(MQ_MINT); }}
+                >
                   <div className="float-card-top">
                     <img className="coin-disc" width="32" height="34" src={MINTI_LOGO_BASE64} alt="Minti Q" />
                     <div>
-                      <div className="float-card-name">$MINTI</div>
+                      <div className="float-card-name">${mqCoin?.symbol ?? "MQ"}</div>
                       <div className="float-card-sub">Paired with <span className="badge">SOL</span></div>
                     </div>
                   </div>
                   <div className="float-card-stats">
-                    <div className="float-card-mcap">$48.2K</div>
-                    <div className="pos">+312%</div>
+                    <div className="float-card-mcap">{mqCoin ? marketCapLabel(mqCoin) : "—"}</div>
+                    <div className="pos">{mqCurveLabel}</div>
                   </div>
                 </div>
               </div>
