@@ -946,7 +946,7 @@ export default function App() {
 
           <section className="wrap tg-page" style={{ paddingBottom: 88 }}>
             <div className="tg-header">
-              <h1>All <span>tokens</span></h1>
+              <h1 style={{ marginTop: 18 }}>All <span>tokens</span></h1>
               <div className="tg-count">{filteredCoins.length} token{filteredCoins.length === 1 ? "" : "s"}</div>
             </div>
             {filteredCoins.length === 0 ? (
@@ -1007,15 +1007,9 @@ export default function App() {
                         </div>
                         <div className="tg-vol">Vol {volLabel(c)}</div>
                       </div>
-                      {isSol ? (
-                        <div className="tg-visual tg-visual-solana">
-                          <div className="tg-solmark"><i></i><i></i><i></i></div>
-                        </div>
-                      ) : (
-                        <div className="tg-visual">
+                      <div className="tg-visual">
                           {quoteToken?.imageUrl ? <img src={quoteToken.imageUrl} alt="" /> : quoteSymbolFor(c)}
                         </div>
-                      )}
                     </article>
                   );
                 })}
