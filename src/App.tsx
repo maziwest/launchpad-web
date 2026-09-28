@@ -225,6 +225,12 @@ export default function App() {
 
   // Hero card: official $MQ token, live data
   const MQ_MINT = "7DTLTsUpAYpvR1CuPmYddWuCPyjik4MVR8WJ1rM5cfMy";
+  // $MQ was launched via CLI without socials in its metadata; fallback until metadata is updated on-chain
+  const MQ_SOCIALS = {
+    website: "https://mintiq.fun/",
+    twitter: "https://x.com/Mintiqdotfun",
+    telegram: "https://t.me/mintiqdotfun",
+  };
   const mqCoin = coins.find((c) => c.mint.toBase58() === MQ_MINT);
   const mqCurveLabel = !mqCoin
     ? ""
@@ -1032,7 +1038,7 @@ export default function App() {
                   </button>
                 </span>
                 {(() => {
-                  const socials = tokenSocials.get(selected.mint.toBase58());
+                  const socials = tokenSocials.get(selected.mint.toBase58()) ?? (selected.mint.toBase58() === MQ_MINT ? MQ_SOCIALS : undefined);
                   if (!socials) return null;
                   return (
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
