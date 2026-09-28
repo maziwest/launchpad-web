@@ -423,7 +423,7 @@ export default function App() {
       return;
     }
     let cancelled = false;
-    (async () => {
+    const loadBalances = async () => {
       try {
         const lamports = await connection.getBalance(wallet.publicKey!);
         if (!cancelled) setWalletSolBalance(lamports / LAMPORTS_PER_SOL);
@@ -437,9 +437,12 @@ export default function App() {
       } catch {
         if (!cancelled) setWalletTokenBalance(null);
       }
-    })();
+    };
+    loadBalances();
+    const balanceId = window.setInterval(() => { if (!document.hidden) loadBalances(); }, 5000);
     return () => {
       cancelled = true;
+      window.clearInterval(balanceId);
     };
   }, [wallet.publicKey, selected?.mint.toBase58(), connection]);
 
