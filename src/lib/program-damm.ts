@@ -284,3 +284,37 @@ export async function dammSell(
 ) {
   return dammSwap(connection, wallet, pool, amountInBaseUnits, minimumAmountOut, true);
 }
+
+/** Connected wallet's LP position in a pool: how much liquidity is unlocked vs permanently locked. */
+export async function fetchDammLockStatus(connection: Connection, poolAddress: PublicKey, owner: PublicKey) {
+  const client = getCpAmmClient(connection);
+  const positions = await client.getUserPositionByPool(poolAddress, owner);
+  if (!positions || positions.length === 0) return null;
+  const s: any = positions[0].positionState;
+  return {
+    position: positions[0].position,
+    unlocked: BigInt(s.unlockedLiquidity.toString()),
+    locked: BigInt(s.permanentLockedLiquidity.toString()),
+  };
+}
+
+/** Permanently locks ALL unlocked liquidity in the owner's position. Irreversible. Fees stay claimable. */
+export async function lockDammPositionPermanently(
+  connection: Connection,
+  wallet: AnchorProvider["wallet"],
+  poolAddress: PublicKey
+) {
+  const client = getCpAmmClient(connection);
+  const positions = await client.getUserPositionByPool(poolAddress, wallet.publicKey);
+  if (!positions || positions.length === 0) throw new Error("This wallet has no LP position in that pool");
+  const { position, positionNftAccount, positionState } = positions[0] as any;
+  if (BigInt(positionState.unlockedLiquidity.toString()) === 0n) throw new Error("Already fully locked");
+  const tx = await client.permanentLockPosition({
+    owner: wallet.publicKey,
+    position,
+    positionNftAccount,
+    pool: poolAddress,
+    unlockedLiquidity: positionState.unlockedLiquidity,
+  } as any);
+  return finalizeAndSend(connection, wallet, tx as any);
+}

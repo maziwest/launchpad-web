@@ -1,3 +1,4 @@
+import AdminLockLp from "./AdminLockLp";
 import React, { useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
@@ -551,6 +552,8 @@ export default function AdminClaimPage() {
       )}
 
       <hr style={{ margin: "40px 0", border: "none", borderTop: "1px solid #2a3a33" }} />
+
+      <AdminLockLp />
 
       <h1 style={{ fontSize: 20, marginBottom: 4 }}>Claim History</h1>
       <p style={{ fontSize: 13, color: "#7e9690", marginBottom: 20 }}>
