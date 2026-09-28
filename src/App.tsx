@@ -579,7 +579,17 @@ export default function App() {
           if (!pool) return null;
           dammPool = pool.poolAddress;
         }
-        return fetchDammTradeHistory(connection, dammPool!, limit);
+        const dammTrades = await fetchDammTradeHistory(connection, dammPool!, limit);
+        if (limit < 50) return dammTrades; // live polls only need the newest DAMM trades
+        // Graduated coins keep their bonding-curve history too, so the chart shows the full life
+        let curveTrades: AnyTradeEvent[] = [];
+        try {
+          curveTrades = await fetchTradesFromApi(mint.toBase58());
+        } catch (err) {
+          console.error("Couldn't load bonding-curve history:", err);
+        }
+        const seen = new Set(dammTrades.map((t) => t.signature));
+        return [...dammTrades, ...curveTrades.filter((t) => !seen.has(t.signature))].sort((a, b) => b.timestamp - a.timestamp);
       }
       if (limit >= 50) {
         // Full history from our backend indexer (no cap); chain is the fallback
