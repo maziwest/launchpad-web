@@ -451,37 +451,61 @@ export default function App() {
   useEffect(() => {
     if (view !== "trade" || !selected) return;
     let cancelled = false;
+    let inFlight = false;
+    let current: AnyTradeEvent[] = [];
+    let dammPool: PublicKey | null = null;
+    const migrated = selected.migrated;
+    const poolAddress = selected.poolAddress;
+    const mint = selected.mint;
+
+    // Adds only trades we haven't seen, newest first
+    const merge = (incoming: AnyTradeEvent[]) => {
+      const seen = new Set(current.map((t) => t.signature));
+      const fresh = incoming.filter((t) => !seen.has(t.signature));
+      if (fresh.length === 0) return false;
+      current = [...fresh, ...current];
+      return true;
+    };
+
+    const fetchTrades = async (limit: number): Promise<AnyTradeEvent[] | null> => {
+      if (migrated) {
+        if (!dammPool) {
+          const pool = await fetchDammPool(connection, mint);
+          if (!pool) return null;
+          dammPool = pool.poolAddress;
+        }
+        return fetchDammTradeHistory(connection, dammPool!, limit);
+      }
+      const { trades: t, claims } = await fetchTradesAndClaims(connection, poolAddress, limit);
+      if (limit >= 50 && !cancelled) setTotalClaimedSol(Number(totalClaimedLamports(claims)) / LAMPORTS_PER_SOL);
+      return t;
+    };
+
+    const load = async (initial: boolean) => {
+      if (inFlight || cancelled) return;
+      if (!initial && document.hidden) return;
+      inFlight = true;
+      try {
+        const fetched = await fetchTrades(initial ? 50 : 10);
+        if (cancelled || !fetched) return;
+        if (initial) current = fetched;
+        else if (!merge(fetched)) return;
+        setTrades(current);
+        setCandles(buildCandles(current, 3600));
+      } catch (err) {
+        console.error("Failed to load trade history:", err);
+      } finally {
+        inFlight = false;
+        if (initial && !cancelled) setChartLoading(false);
+      }
+    };
+
     setChartLoading(true);
-
-    if (selected.migrated) {
-      fetchDammPool(connection, selected.mint)
-        .then((pool) => {
-          if (!pool || cancelled) return null;
-          return fetchDammTradeHistory(connection, pool.poolAddress, 50);
-        })
-        .then((fetchedTrades) => {
-          if (cancelled || !fetchedTrades) return;
-          setTrades(fetchedTrades);
-          setCandles(buildCandles(fetchedTrades, 3600));
-        })
-        .catch((err) => console.error("Failed to load DAMM v2 trade history:", err))
-        .finally(() => !cancelled && setChartLoading(false));
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    fetchTradesAndClaims(connection, selected.poolAddress, 50)
-      .then(({ trades: fetchedTrades, claims }) => {
-        if (cancelled) return;
-        setTrades(fetchedTrades);
-        setCandles(buildCandles(fetchedTrades, 3600));
-        setTotalClaimedSol(Number(totalClaimedLamports(claims)) / LAMPORTS_PER_SOL);
-      })
-      .catch((err) => console.error("Failed to load trade history:", err))
-      .finally(() => !cancelled && setChartLoading(false));
+    load(true);
+    const pollId = window.setInterval(() => load(false), 5000);
     return () => {
       cancelled = true;
+      window.clearInterval(pollId);
     };
   }, [view, selectedMint, connection, selected?.migrated]);
 
