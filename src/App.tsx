@@ -1,3 +1,4 @@
+import BurnPage from "./BurnPage";
 import { PAIR_CATEGORIES } from "./lib/quote-tokens";
 import { fetchTradesFromApi, fetchClaimsFromApi } from "./lib/program-dbc";
 import React, { useCallback, useEffect, useState } from "react";
@@ -149,7 +150,7 @@ export default function App() {
     return path.length > 0 ? path : null;
   })();
   const [selectedMint, setSelectedMint] = useState<string | null>(initialPathMint);
-  const [view, setView] = useState<"discover" | "trade" | "create">(initialPathMint ? "trade" : "discover");
+  const [view, setView] = useState<"discover" | "trade" | "create" | "burn">(initialPathMint ? "trade" : "discover");
 
   // Browser back/forward should navigate too, not just our own buttons.
   useEffect(() => {
@@ -846,6 +847,7 @@ export default function App() {
           </div>
           <nav className="nav-links">
             <a onClick={() => goToSection("tokens")} style={{ cursor: "pointer" }}>$MQ</a>
+            <a style={{ cursor: "pointer" }} onClick={() => setView("burn")}>Burn</a>
             <a>Royalties</a>
             <a>Revenue</a>
             <a>Documentation</a>
@@ -900,6 +902,7 @@ export default function App() {
           <div className="mobile-menu open">
             <nav className="mobile-menu-links">
               <a onClick={() => { goToSection("tokens"); setMobileMenuOpen(false); }} style={{ cursor: "pointer" }}>$MQ</a>
+              <a style={{ cursor: "pointer" }} onClick={() => { setView("burn"); setMobileMenuOpen(false); }}>Burn</a>
               <a>Royalties</a>
               <a>Revenue</a>
               <a>Documentation</a>
@@ -1802,6 +1805,7 @@ export default function App() {
 </div>
       )}
 
+      {view === "burn" && <BurnPage />}
       {view === "create" && (
         <CreateCoinPage
           onBack={() => goToDiscover()}
