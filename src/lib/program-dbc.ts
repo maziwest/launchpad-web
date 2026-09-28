@@ -1113,3 +1113,18 @@ export async function fetchConfigSummary(connection: Connection, configKey: Publ
     protocolFeePct,
   };
 }
+
+/** Full trade history from our backend indexer, newest first. No cap. */
+export async function fetchTradesFromApi(mint: string): Promise<TradeEvent[]> {
+  const res = await fetch(`${API_BASE_URL}/coins/${mint}/trades`);
+  if (!res.ok) throw new Error(`trades API ${res.status}`);
+  return res.json();
+}
+
+/** Every creator fee claim from our backend indexer, newest first. */
+export async function fetchClaimsFromApi(mint: string): Promise<ClaimEvent[]> {
+  const res = await fetch(`${API_BASE_URL}/coins/${mint}/claims`);
+  if (!res.ok) throw new Error(`claims API ${res.status}`);
+  const rows: { signature: string; quoteAmountLamports: string }[] = await res.json();
+  return rows.map((r) => ({ signature: r.signature, quoteAmountLamports: BigInt(r.quoteAmountLamports) }));
+}

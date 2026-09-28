@@ -1,3 +1,4 @@
+import { fetchTradesFromApi, fetchClaimsFromApi } from "./lib/program-dbc";
 import React, { useCallback, useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -494,6 +495,19 @@ export default function App() {
           dammPool = pool.poolAddress;
         }
         return fetchDammTradeHistory(connection, dammPool!, limit);
+      }
+      if (limit >= 50) {
+        // Full history from our backend indexer (no cap); chain is the fallback
+        try {
+          const [apiTrades, apiClaims] = await Promise.all([
+            fetchTradesFromApi(mint.toBase58()),
+            fetchClaimsFromApi(mint.toBase58()),
+          ]);
+          if (!cancelled) setTotalClaimedSol(Number(totalClaimedLamports(apiClaims)) / LAMPORTS_PER_SOL);
+          return apiTrades;
+        } catch (err) {
+          console.error("Trades API unavailable, falling back to chain:", err);
+        }
       }
       const { trades: t, claims } = await fetchTradesAndClaims(connection, poolAddress, limit);
       if (limit >= 50 && !cancelled) setTotalClaimedSol(Number(totalClaimedLamports(claims)) / LAMPORTS_PER_SOL);
