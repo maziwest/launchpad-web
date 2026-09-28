@@ -464,6 +464,7 @@ export default function App() {
   }, [wallet.publicKey, selected?.mint.toBase58(), connection]);
 
   const [trades, setTrades] = useState<AnyTradeEvent[]>([]);
+  const [tradesShown, setTradesShown] = useState(10);
   const [candles, setCandles] = useState<ReturnType<typeof buildCandles>>([]);
   const [totalClaimedSol, setTotalClaimedSol] = useState(0);
   const [chartLoading, setChartLoading] = useState(false);
@@ -473,6 +474,7 @@ export default function App() {
     let cancelled = false;
     let inFlight = false;
     let current: AnyTradeEvent[] = [];
+    setTradesShown(10);
     let dammPool: PublicKey | null = null;
     const migrated = selected.migrated;
     const poolAddress = selected.poolAddress;
@@ -1178,7 +1180,7 @@ export default function App() {
           <div className="card-head-count"><span className="live-dot"></span>Live</div>
         </div>
         {(() => {
-          const shown = trades.slice(0, 9);
+          const shown = trades.slice(0, tradesShown);
           const usdPrice = selected.quoteUsdPrice ?? solUsdPrice;
           const quoteSym = quoteSymbolFor(selected);
 
@@ -1242,7 +1244,19 @@ export default function App() {
                 </tbody>
               </table>
               <div className="holders-footer">
-                Showing latest {shown.length} of {trades.length} fetched trades
+                Showing {shown.length} of {trades.length} trades
+                {shown.length < trades.length && (
+                  <>
+                    {" · "}
+                    <button
+                      type="button"
+                      onClick={() => setTradesShown((n) => n + 10)}
+                      style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "#35D68C", cursor: "pointer" }}
+                    >
+                      Show more
+                    </button>
+                  </>
+                )}
               </div>
             </>
           );
