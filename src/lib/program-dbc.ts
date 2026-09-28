@@ -16,6 +16,8 @@ import { generateVanityKeypair } from "./vanity";
 import { getMint, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 export const DBC_CONFIG_KEY = new PublicKey(import.meta.env.VITE_DBC_CONFIG_KEY);
+export const MQ_CONFIG_KEY = new PublicKey("BT94C7EnZE75Fvot4CbFJzKbht7yXnieVFWgVHG3F1Rs");
+export const DISPLAY_CONFIG_KEYS = [DBC_CONFIG_KEY, MQ_CONFIG_KEY]; // configs shown on the site; NOT the launch picker
 export const DBC_PROGRAM_ID = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
 export const QUOTE_MINT = new PublicKey("So11111111111111111111111111111111111111112"); // SOL
 export const MIGRATION_QUOTE_THRESHOLD_LAMPORTS = 85_000_000_000; // matches our config (85 SOL)
@@ -153,7 +155,7 @@ export interface OnChainCoin {
 /** All coins launched under our config key, with real Metaplex name/symbol attached. */
 export async function fetchAllCoins(connection: Connection): Promise<OnChainCoin[]> {
   const client = getDbcClient(connection);
-  const pools = await client.state.getPoolsByConfig(DBC_CONFIG_KEY);
+  const pools = (await Promise.all(DISPLAY_CONFIG_KEYS.map((k) => client.state.getPoolsByConfig(k)))).flat();
 
   return Promise.all(
     pools.map(async ({ publicKey, account }) => {
