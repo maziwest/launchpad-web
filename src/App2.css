@@ -1,0 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+
+:root{
+  --ink:#0B0F0E;
+  --mint:#35D68C;
+  --chart-up:#22A76D;
+  --chart-down:#D94F3E;
+  --teal:#0E4F42;
+  --gold:#E7C36B;
+  --paper:#F6FBF8;
+  --paper-dim:rgba(246,251,248,0.62);
+  --paper-faint:rgba(246,251,248,0.38);
+  --border:rgba(246,251,248,0.12);
+  --panel:rgba(246,251,248,0.035);
+  --display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --body: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+}
+html, body { margin:0; background:var(--ink); }
+* { box-sizing:border-box; }
+a { color:var(--paper); text-decoration:none; }
+a:hover { color:var(--mint); }
+::selection { background:var(--mint); color:var(--ink); }
+body { color:var(--paper); font-family:var(--body); }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+button { font-family: var(--body); cursor: pointer; }
+
+.mq2-avatar { border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:var(--display); font-weight:700; flex-shrink:0; }
+.mq2-bar-track { height:6px; border-radius:999px; background:rgba(246,251,248,0.1); overflow:hidden; }
+.mq2-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg, var(--teal), var(--mint)); }
+
+.mq2-live-card { background:linear-gradient(180deg, rgba(14,79,66,0.28), rgba(14,79,66,0.08)); border:1px solid rgba(53,214,140,0.22); border-radius:16px; padding:22px; display:flex; flex-direction:column; gap:16px; cursor:pointer; text-align:left; }
+.mq2-launch-card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:20px; display:flex; flex-direction:column; gap:14px; cursor:pointer; text-align:left; }
+.mq2-filter-pill { font-size:13px; font-weight:600; padding:8px 16px; border-radius:999px; border:1px solid var(--border); color:var(--paper-dim); background:none; cursor:pointer; }
+.mq2-filter-pill.on { color:var(--ink); background:var(--mint); border-color:var(--mint); }
+.mq2-search-input { background:transparent; border:none; outline:none; color:var(--paper); font-size:14px; font-family:var(--body); flex:1; }
+.mq2-search-input::placeholder { color:var(--paper-faint); }

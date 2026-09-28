@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+*keypair*.json
+id.json
+*.key
+*.log
+.DS_Store
