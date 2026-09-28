@@ -345,11 +345,27 @@ export default function App() {
       return;
     }
     let cancelled = false;
-    fetchCoin(connection, new PublicKey(selectedMint))
-      .then((c) => !cancelled && setFreshSelectedCoin(c))
-      .catch((err) => console.error("Failed to fetch fresh coin state:", err));
+    let inFlight = false;
+    const mintKey = new PublicKey(selectedMint);
+    const loadCoin = async (initial: boolean) => {
+      if (inFlight || cancelled) return;
+      if (!initial && document.hidden) return;
+      inFlight = true;
+      try {
+        const c = await fetchCoin(connection, mintKey);
+        // Polls only overwrite with real data, never blank the stats
+        if (!cancelled && (initial || c)) setFreshSelectedCoin(c);
+      } catch (err) {
+        console.error("Failed to fetch fresh coin state:", err);
+      } finally {
+        inFlight = false;
+      }
+    };
+    loadCoin(true);
+    const coinId = window.setInterval(() => loadCoin(false), 5000);
     return () => {
       cancelled = true;
+      window.clearInterval(coinId);
     };
   }, [view, selectedMint, connection]);
 
