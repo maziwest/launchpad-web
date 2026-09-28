@@ -734,7 +734,21 @@ export default function App() {
       const fresh = await fetchCoin(connection, coin.mint);
       const remaining = fresh ? fresh.migrationThresholdLamports - fresh.quoteReserveLamports : null;
       const likelyCompletesCurve = remaining !== null && remaining > 0n && preciseLamports >= remaining;
-      const lamports = likelyCompletesCurve ? preciseLamports * 2n : preciseLamports;
+      let lamports = preciseLamports;
+      if (likelyCompletesCurve) {
+        // Cap at what's left on the curve (+1% buffer for the protocol's own rounding).
+        // Partial fill takes exactly what's left and refunds the rest.
+        const neededGross = grossUpForFee(remaining!, realFeeBps);
+        const capped = neededGross + neededGross / 100n + 100_000n;
+        const balance = BigInt(await connection.getBalance(wallet.publicKey));
+        if (balance - 15_000_000n < capped) {
+          throw new Error(`Need about ${(Number(capped + 15_000_000n) / LAMPORTS_PER_SOL).toFixed(4)} SOL to complete the curve`);
+        }
+        if (capped < lamports) {
+          lamports = capped;
+          fireToast(`Only ${(Number(neededGross) / LAMPORTS_PER_SOL).toFixed(4)} SOL left on the curve, buying that`, "buy");
+        }
+      }
 
       const quote = await quotePartialFillTrade(connection, coin.poolAddress, lamports, Math.round(slippagePct * 100));
       const sig = await buyPartialFill(connection, walletFor(), coin.poolAddress, lamports, quote.minimumAmountOut);
