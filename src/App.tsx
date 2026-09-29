@@ -263,6 +263,7 @@ export default function App() {
   const [tab, setTab] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [slippagePct, setSlippagePct] = useState(1);
+  const [activityTick, setActivityTick] = useState(0); // bumps when a new trade arrives on the open coin
   const [showSettings, setShowSettings] = useState(false);
   const amountInputRef = React.useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{ msg: string; kind: string } | null>(null);
@@ -475,12 +476,12 @@ export default function App() {
       }
     };
     loadCoin(true);
-    const coinId = window.setInterval(() => loadCoin(false), 5000);
+    const coinId = window.setInterval(() => loadCoin(false), 30000);
     return () => {
       cancelled = true;
       window.clearInterval(coinId);
     };
-  }, [view, selectedMint, connection]);
+  }, [view, selectedMint, connection, activityTick]);
 
   const selectedListCoin = coins.find((c) => c.mint.toBase58() === selectedMint);
   // Live chain data lacks backend-only fields (quote USD price, 24h volume, verified); keep them from the coin list
@@ -577,12 +578,12 @@ export default function App() {
       }
     };
     loadBalances();
-    const balanceId = window.setInterval(() => { if (!document.hidden) loadBalances(); }, 5000);
+    const balanceId = window.setInterval(() => { if (!document.hidden) loadBalances(); }, 30000);
     return () => {
       cancelled = true;
       window.clearInterval(balanceId);
     };
-  }, [wallet.publicKey, selected?.mint.toBase58(), connection]);
+  }, [wallet.publicKey, selected?.mint.toBase58(), connection, activityTick]);
 
   // Real swap quote from Meteora's SDK (includes price impact + fees), not amount x spot price
   const [liveQuote, setLiveQuote] = useState<{ key: string; out: number } | null>(null);
@@ -660,7 +661,23 @@ export default function App() {
     };
 
     const fetchTrades = async (limit: number): Promise<AnyTradeEvent[] | null> => {
+      // Live polls read from our own API (indexer saves trades within ~5s): no RPC calls
+      if (limit < 50) {
+        try {
+          const newest = current.length ? current[0].timestamp : 0;
+          return await fetchTradesFromApi(mint.toBase58(), newest);
+        } catch (err) {
+          console.error("Trades API poll failed, falling back to chain:", err);
+        }
+      }
       if (migrated) {
+        if (limit >= 50) {
+          try {
+            return await fetchTradesFromApi(mint.toBase58());
+          } catch (err) {
+            console.error("Trades API unavailable, falling back to chain:", err);
+          }
+        }
         if (!dammPool) {
           const pool = await fetchDammPool(connection, mint);
           if (!pool) return null;
@@ -710,6 +727,7 @@ export default function App() {
         if (cancelled || !fetched) return;
         if (initial) current = fetched;
         else if (!merge(fetched)) return;
+        else setActivityTick((n) => n + 1);
         setTrades(current);
         setCandles(buildCandles(current, 3600));
       } catch (err) {

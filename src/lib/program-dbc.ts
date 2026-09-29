@@ -1128,8 +1128,8 @@ export async function fetchConfigSummary(connection: Connection, configKey: Publ
 }
 
 /** Full trade history from our backend indexer, newest first. No cap. */
-export async function fetchTradesFromApi(mint: string): Promise<TradeEvent[]> {
-  const res = await fetch(`${API_BASE_URL}/coins/${mint}/trades`);
+export async function fetchTradesFromApi(mint: string, since?: number): Promise<TradeEvent[]> {
+  const res = await fetch(`${API_BASE_URL}/coins/${mint}/trades${since ? `?since=${since}` : ""}`);
   if (!res.ok) throw new Error(`trades API ${res.status}`);
   return res.json();
 }
