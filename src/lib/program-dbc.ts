@@ -1,3 +1,4 @@
+import { API_BASE_URL, MQ_CONFIG_KEY_STR } from "./network";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction, AddressLookupTableAccount } from "@solana/web3.js";
 import {
@@ -16,7 +17,7 @@ import { generateVanityKeypair } from "./vanity";
 import { getMint, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 
 export const DBC_CONFIG_KEY = new PublicKey(import.meta.env.VITE_DBC_CONFIG_KEY);
-export const MQ_CONFIG_KEY = new PublicKey("BT94C7EnZE75Fvot4CbFJzKbht7yXnieVFWgVHG3F1Rs");
+export const MQ_CONFIG_KEY = new PublicKey(MQ_CONFIG_KEY_STR);
 export const DISPLAY_CONFIG_KEYS = [DBC_CONFIG_KEY, MQ_CONFIG_KEY]; // configs shown on the site; NOT the launch picker
 export const DBC_PROGRAM_ID = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
 export const QUOTE_MINT = new PublicKey("So11111111111111111111111111111111111111112"); // SOL
@@ -909,7 +910,6 @@ export function setTokenVerified(mint: string, verified: boolean) {
   localStorage.setItem(VERIFIED_TOKENS_KEY, JSON.stringify([...current]));
 }
 
-const API_BASE_URL = "https://api.mintiq.fun";
 
 /**
  * Fetches the coin list from our own indexed backend instead of querying

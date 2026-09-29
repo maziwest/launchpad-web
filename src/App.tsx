@@ -1,3 +1,4 @@
+import { MQ_MINT, EXPLORER_SUFFIX } from "./lib/network";
 import MqBurnCard from "./MqBurnCard";
 import BurnPage from "./BurnPage";
 import { PAIR_CATEGORIES } from "./lib/quote-tokens";
@@ -312,7 +313,6 @@ export default function App() {
   }, [coins.length > 0, connection]);
 
   // Hero card: official $MQ token, live data
-  const MQ_MINT = "7DTLTsUpAYpvR1CuPmYddWuCPyjik4MVR8WJ1rM5cfMy";
   // $MQ was launched via CLI without socials in its metadata; fallback until metadata is updated on-chain
   const MQ_SOCIALS = {
     website: "https://mintiq.fun/",
@@ -1435,7 +1435,7 @@ export default function App() {
           <div className="token-header-actions">
             <a
               className="btn btn-outline"
-              href={`https://solscan.io/token/${selected.mint.toBase58()}?cluster=devnet`}
+              href={`https://solscan.io/token/${selected.mint.toBase58()}${EXPLORER_SUFFIX}`}
               target="_blank"
               rel="noreferrer"
             >
@@ -1539,7 +1539,7 @@ export default function App() {
                               </button>
                             )}
                             <a
-                              href={`https://solscan.io/tx/${t.signature}?cluster=devnet`}
+                              href={`https://solscan.io/tx/${t.signature}${EXPLORER_SUFFIX}`}
                               target="_blank"
                               rel="noreferrer"
                               className="info-copy-btn"
@@ -1728,7 +1728,7 @@ export default function App() {
           );
         })()}
       </div>
-      {selected.mint.toBase58() === "7DTLTsUpAYpvR1CuPmYddWuCPyjik4MVR8WJ1rM5cfMy" && (
+      {selected.mint.toBase58() === MQ_MINT && (
         <MqBurnCard
           priceUsd={usdPriceFor(selected) != null ? selected.priceInSol * usdPriceFor(selected)! : null}
           onViewAll={() => setView("burn")}
@@ -1736,7 +1736,7 @@ export default function App() {
       )}
       <div
         className="card royalty-card"
-        style={selected.mint.toBase58() === "7DTLTsUpAYpvR1CuPmYddWuCPyjik4MVR8WJ1rM5cfMy" ? { display: "none" } : undefined}
+        style={selected.mint.toBase58() === MQ_MINT ? { display: "none" } : undefined}
       >
         <div className="card-head">
           <div className="card-head-icon">

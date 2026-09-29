@@ -1,3 +1,4 @@
+import { ADMIN_WALLET, API_BASE_URL, EXPLORER_SUFFIX, IS_MAINNET } from "./lib/network";
 import { fetchVerifiedMintsFromApi, setCoinVerifiedApi } from "./lib/program-dbc";
 import React, { useCallback, useEffect, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -23,7 +24,6 @@ import { fetchDammPool, fetchDammPosition, claimDammPositionFee } from "./lib/pr
 // Only this wallet may verify tokens or trigger a fresh scan. Everyone else
 // sees the dashboard's numbers (harmless to view) but every control is
 // disabled until this exact wallet is connected.
-const ADMIN_WALLET = "HVJweDmPS5jgrb49fL4Q7U3wRAJfZcs3AL7cBW3nVdX5";
 
 const ACCENT = "#C8F25A";
 const BG = "#0F100D";
@@ -114,7 +114,6 @@ function NavButton({ label, icon, active, onClick }: { label: string; icon: Reac
   );
 }
 
-const API_BASE_URL = "https://api.mintiq.fun";
 const AUTH_TOKEN_KEY = "mintiq_admin_token";
 
 export default function AdminDashboardPage() {
@@ -667,7 +666,7 @@ export default function AdminDashboardPage() {
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 32, padding: "0 12px", borderRadius: 16, border: `1px solid ${BORDER}`, fontSize: 13, color: TEXT }}>
               <span style={{ width: 8, height: 8, borderRadius: 4, background: ACCENT }}></span>
-              Solana devnet
+              {IS_MAINNET ? "Solana mainnet" : "Solana devnet"}
             </span>
             <WalletMultiButton />
           </div>
@@ -997,7 +996,7 @@ export default function AdminDashboardPage() {
                           <span style={{ color: MUTED, fontSize: 12 }}>{new Date(entry.timestamp).toLocaleString()}</span>
                         </div>
                         <div style={{ color: MUTED, fontFamily: FONT_MONO, fontSize: 11, wordBreak: "break-all" }}>{entry.target}</div>
-                        <a href={`https://solscan.io/tx/${entry.signature}?cluster=devnet`} target="_blank" rel="noreferrer" style={{ color: ACCENT, fontSize: 11 }}>
+                        <a href={`https://solscan.io/tx/${entry.signature}${EXPLORER_SUFFIX}`} target="_blank" rel="noreferrer" style={{ color: ACCENT, fontSize: 11 }}>
                           View transaction ↗
                         </a>
                       </div>

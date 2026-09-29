@@ -1,3 +1,4 @@
+import { IS_MAINNET } from "./network";
 import { WebUploader } from "@irys/web-upload";
 import { WebSolana } from "@irys/web-upload-solana";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
@@ -6,10 +7,11 @@ async function getIrysUploader(wallet: WalletContextState) {
   // .devnet() alone isn't enough — Irys needs an explicit Solana RPC to
   // check balances/funding against on devnet (unlike mainnet, which has a
   // sensible default). Using the same RPC as the rest of the app.
-  return WebUploader(WebSolana)
+  const builder = WebUploader(WebSolana)
     .withProvider(wallet as any)
-    .withRpc(import.meta.env.VITE_RPC_ENDPOINT)
-    .devnet();
+    .withRpc(import.meta.env.VITE_RPC_ENDPOINT);
+  // Devnet: Irys devnet (free test SOL). Mainnet: real Irys, paid in real SOL by the launcher's wallet
+  return IS_MAINNET ? builder : builder.devnet();
 }
 
 export async function uploadImage(wallet: WalletContextState, file: File): Promise<string> {

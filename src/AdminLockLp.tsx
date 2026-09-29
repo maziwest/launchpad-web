@@ -1,3 +1,4 @@
+import { EXPLORER_SUFFIX, MQ_MINT } from "./lib/network";
 import { useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
@@ -8,7 +9,7 @@ const pct = (part: bigint, total: bigint) => (total === 0n ? "0.00" : (Number((p
 export default function AdminLockLp() {
   const { connection } = useConnection();
   const wallet = useWallet();
-  const [mint, setMint] = useState("7DTLTsUpAYpvR1CuPmYddWuCPyjik4MVR8WJ1rM5cfMy");
+  const [mint, setMint] = useState(MQ_MINT);
   const [status, setStatus] = useState<{ pool: PublicKey; unlocked: bigint; locked: bigint } | null>(null);
   const [msg, setMsg] = useState("");
   const [sig, setSig] = useState("");
@@ -83,7 +84,7 @@ export default function AdminLockLp() {
       )}
       {msg && <div style={{ marginTop: 12, fontSize: 13, opacity: 0.85 }}>{msg}</div>}
       {sig && (
-        <a href={`https://solscan.io/tx/${sig}?cluster=devnet`} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 6, fontSize: 13, color: "#35D68C" }}>
+        <a href={`https://solscan.io/tx/${sig}${EXPLORER_SUFFIX}`} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 6, fontSize: 13, color: "#35D68C" }}>
           View transaction
         </a>
       )}

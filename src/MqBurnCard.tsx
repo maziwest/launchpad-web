@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "./lib/network";
 import { useEffect, useState } from "react";
 
 interface Totals {
@@ -32,7 +33,7 @@ export default function MqBurnCard({ priceUsd, onViewAll }: { priceUsd: number |
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch("https://api.mintiq.fun/buybacks");
+        const res = await fetch(`${API_BASE_URL}/buybacks`);
         if (res.ok && !cancelled) setT(await res.json());
       } catch {}
     };

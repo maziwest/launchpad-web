@@ -1,3 +1,4 @@
+import { EXPLORER_SUFFIX } from "./lib/network";
 import AdminLockLp from "./AdminLockLp";
 import React, { useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -579,7 +580,7 @@ export default function AdminClaimPage() {
                 {entry.target}
               </div>
               <a
-                href={`https://solscan.io/tx/${entry.signature}?cluster=devnet`}
+                href={`https://solscan.io/tx/${entry.signature}${EXPLORER_SUFFIX}`}
                 target="_blank"
                 rel="noreferrer"
                 style={{ color: "#35D68C", fontSize: 11 }}

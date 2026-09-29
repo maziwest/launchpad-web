@@ -1,8 +1,7 @@
+import { API_BASE_URL, EXPLORER_SUFFIX, BUYBACK_WALLET } from "./lib/network";
 import { useEffect, useState } from "react";
 
-const API = "https://api.mintiq.fun/buybacks";
-const EXPLORER_SUFFIX = "?cluster=devnet"; // remove for mainnet
-const BUYBACK_WALLET = "7j5KayahE3Sz3E8JRpAVVj7spkFCsaJt8wV6N6KwFkZo";
+const API = `${API_BASE_URL}/buybacks`;
 
 interface Run {
   id: number;

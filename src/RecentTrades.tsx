@@ -1,3 +1,4 @@
+import { EXPLORER_SUFFIX } from "./lib/network";
 import React from "react";
 
 export interface TradeEvent {
@@ -52,7 +53,7 @@ export default function RecentTrades({ trades, symbol }: { trades: TradeEvent[];
             {t.isBuy ? "BUY" : "SELL"}
           </span>
           <a
-            href={`https://explorer.solana.com/tx/${t.signature}?cluster=devnet`}
+            href={`https://explorer.solana.com/tx/${t.signature}${EXPLORER_SUFFIX}`}
             target="_blank"
             rel="noreferrer"
             className="mono"

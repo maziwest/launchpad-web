@@ -1,3 +1,4 @@
+import { IS_MAINNET } from "./network";
 import { PublicKey } from "@solana/web3.js";
 
 /**
@@ -30,14 +31,17 @@ export const QUOTE_TOKEN_OPTIONS: QuoteTokenOption[] = [
     category: "Solana",
     imageUrl: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
   },
-  {
-    mint: new PublicKey("Ckd6UDouz9y1ZfuSD1nXErb5ZmJ9RsXzK3XGRZTXtnWA"),
-    configKey: new PublicKey("AmnRCc1crs4ZLroUP16BJZW57GEEnCqDP7odTVQXCM6A"),
-    symbol: "MSPCX",
-    displayName: "Mock SpaceX (devnet test)",
-    decimals: 6,
-    category: "Sunrise",
-  },
+  // Devnet-only test quote token; never shown on mainnet
+  ...((IS_MAINNET ? [] : [
+    {
+      mint: new PublicKey("Ckd6UDouz9y1ZfuSD1nXErb5ZmJ9RsXzK3XGRZTXtnWA"),
+      configKey: new PublicKey("AmnRCc1crs4ZLroUP16BJZW57GEEnCqDP7odTVQXCM6A"),
+      symbol: "MSPCX",
+      displayName: "Mock SpaceX (devnet test)",
+      decimals: 6,
+      category: "Sunrise",
+    },
+  ]) as QuoteTokenOption[]),
 ];
 
 export function getQuoteTokenByMint(mint: PublicKey): QuoteTokenOption | undefined {
