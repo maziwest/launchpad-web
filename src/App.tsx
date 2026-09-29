@@ -584,6 +584,50 @@ export default function App() {
     };
   }, [wallet.publicKey, selected?.mint.toBase58(), connection]);
 
+  // Real swap quote from Meteora's SDK (includes price impact + fees), not amount x spot price
+  const [liveQuote, setLiveQuote] = useState<{ key: string; out: number } | null>(null);
+  useEffect(() => {
+    const amt = parseFloat(amount) || 0;
+    if (view !== "trade" || !selected || amt <= 0) {
+      setLiveQuote(null);
+      return;
+    }
+    const coin = selected;
+    const key = `${coin.mint.toBase58()}|${tab}|${amount}`;
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      try {
+        const slip = Math.round(slippagePct * 100);
+        let out: number;
+        if (coin.migrated) {
+          const pool = await fetchDammPool(connection, coin.mint);
+          if (!pool) throw new Error("DAMM v2 pool not found");
+          const inDec = tab === "buy" ? pool.quoteDecimals : pool.baseDecimals;
+          const outDec = tab === "buy" ? pool.baseDecimals : pool.quoteDecimals;
+          const q: any = await quoteDammTrade(connection, pool, BigInt(Math.floor(amt * 10 ** inDec)), tab === "sell", slip);
+          out = Number(q.outputAmount.toString()) / 10 ** outDec;
+        } else {
+          const inDec = tab === "buy" ? coin.quoteDecimals : TOKEN_DECIMALS;
+          const outDec = tab === "buy" ? TOKEN_DECIMALS : coin.quoteDecimals;
+          const amountIn = BigInt(Math.floor(amt * 10 ** inDec));
+          const q =
+            tab === "buy"
+              ? await quotePartialFillTrade(connection, coin.poolAddress, amountIn, slip)
+              : await quoteTrade(connection, coin.poolAddress, amountIn, true, slip);
+          out = Number(q.outputAmount) / 10 ** outDec;
+        }
+        if (!cancelled) setLiveQuote({ key, out });
+      } catch (err) {
+        console.error("Quote failed:", err);
+        if (!cancelled) setLiveQuote(null);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [amount, tab, view, selected?.mint.toBase58(), selected?.migrated, slippagePct, connection]);
+
   const [trades, setTrades] = useState<AnyTradeEvent[]>([]);
   const [tradesShown, setTradesShown] = useState(10);
   const [lastClaim, setLastClaim] = useState<{ amountLamports: bigint; timestamp?: number } | null>(null);
@@ -1548,9 +1592,12 @@ export default function App() {
           const receiveLabel = tab === "buy" ? selected.symbol : quoteSymbolFor(selected);
           const payBalance = tab === "buy" ? walletSolBalance : walletTokenBalance;
           const typedAmount = parseFloat(amount) || 0;
-          const estimatedReceive = selected.priceInSol > 0
-            ? (tab === "buy" ? typedAmount / selected.priceInSol : typedAmount * selected.priceInSol)
-            : 0;
+          const quoteKey = `${selected.mint.toBase58()}|${tab}|${amount}`;
+          const quoteReady = !!liveQuote && liveQuote.key === quoteKey;
+          const estimatedReceive = quoteReady ? liveQuote!.out : 0;
+          // How much worse than the current price this trade is (price impact + trading fee)
+          const spotOut = selected.priceInSol > 0 ? (tab === "buy" ? typedAmount / selected.priceInSol : typedAmount * selected.priceInSol) : 0;
+          const impactPct = quoteReady && spotOut > 0 ? Math.max(0, (1 - estimatedReceive / spotOut) * 100) : null;
           const usdPrice = usdPriceFor(selected);
           const estimatedUsd = usdPrice != null ? (tab === "buy" ? typedAmount * usdPrice : estimatedReceive * usdPrice) : null;
 
@@ -1607,13 +1654,13 @@ export default function App() {
 
               <div className="swap-field">
                 <div className="swap-field-row">
-                  <span className="swap-field-label">You receive</span>
+                  <span className="swap-field-label">{tab === "sell" ? "You receive" : ""}</span>
                   <span className="swap-field-balance">
                     Balance: {(tab === "buy" ? walletTokenBalance : walletSolBalance) != null ? (tab === "buy" ? walletTokenBalance : walletSolBalance)!.toLocaleString(undefined, { maximumFractionDigits: 4 }) : "—"} {receiveLabel}
                   </span>
                 </div>
                 <div className="swap-field-input-row">
-                  <input type="text" className="swap-amount-input" placeholder="0.0" readOnly value={typedAmount > 0 ? estimatedReceive.toLocaleString(undefined, { maximumFractionDigits: 6 }) : ""} />
+                  <input type="text" className="swap-amount-input" placeholder="0.0" readOnly value={typedAmount > 0 ? (quoteReady ? estimatedReceive.toLocaleString(undefined, { maximumFractionDigits: 6 }) : "...") : ""} />
                   <div className="swap-token-pill">
                     {tab === "buy" ? (
                       <span className="swap-token-dot" style={{ background: "linear-gradient(135deg,#35D68C,#1E8F5F)" }}></span>
@@ -1625,9 +1672,14 @@ export default function App() {
                     {receiveLabel}
                   </div>
                 </div>
-                {estimatedUsd != null && typedAmount > 0 && <div className="swap-usd-note">&asymp; ${estimatedUsd.toFixed(2)}</div>}
+                {estimatedUsd != null && typedAmount > 0 && (tab === "buy" || quoteReady) && <div className="swap-usd-note">&asymp; ${estimatedUsd.toFixed(2)}</div>}
               </div>
 
+              {tab === "sell" && impactPct != null && impactPct >= 5 && typedAmount > 0 && (
+                <div style={{ fontSize: 12, color: "#FF7878", background: "rgba(255,120,120,0.08)", border: "1px solid rgba(255,120,120,0.25)", borderRadius: 10, padding: "8px 10px", marginBottom: 10, lineHeight: 1.5 }}>
+                  ⚠ This sell moves the price about {impactPct.toFixed(1)}%. Consider selling in smaller parts.
+                </div>
+              )}
               <div className="swap-rate-row">
                 <span>1 {quoteSymbolFor(selected)} &asymp; {selected.priceInSol > 0 ? (1 / selected.priceInSol).toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"} {selected.symbol}</span>
                 <span className="swap-slippage-tag">Slippage {slippagePct}%</span>
