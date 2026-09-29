@@ -271,10 +271,34 @@ export default function App() {
 
   const [solUsdPrice, setSolUsdPrice] = useState<number | null>(null);
   useEffect(() => {
-    fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd")
-      .then((r) => r.json())
-      .then((data) => setSolUsdPrice(data?.solana?.usd ?? null))
-      .catch(() => setSolUsdPrice(null));
+    let cancelled = false;
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    const load = async () => {
+      // 1) Jupiter Price API: priced from on-chain DEX liquidity (Meteora pools included)
+      try {
+        const r = await fetch(`https://lite-api.jup.ag/price/v3?ids=${SOL_MINT}`);
+        if (r.ok) {
+          const d = await r.json();
+          const px = Number(d?.[SOL_MINT]?.usdPrice ?? d?.data?.[SOL_MINT]?.price);
+          if (px > 0) {
+            if (!cancelled) setSolUsdPrice(px);
+            return;
+          }
+        }
+      } catch {}
+      // 2) Backup: CoinGecko. On total failure, keep the last good price rather than blanking it
+      try {
+        const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd");
+        const px = Number((await r.json())?.solana?.usd);
+        if (px > 0 && !cancelled) setSolUsdPrice(px);
+      } catch {}
+    };
+    load();
+    const id = window.setInterval(() => { if (!document.hidden) load(); }, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, []);
 
   const [launchCostSol, setLaunchCostSol] = useState<number | null>(null);
@@ -300,19 +324,25 @@ export default function App() {
     ? "Graduated"
     : `${Math.floor(Math.min(100, (Number(mqCoin.quoteReserveLamports) / Math.max(1, Number(mqCoin.migrationThresholdLamports))) * 100))}% to grad`;
 
+  /** USD price of a coin's quote asset: SOL from Jupiter (on-chain derived), other quotes from our backend. */
+  function usdPriceFor(coin: OnChainCoin): number | null {
+    if (coin.quoteMint.toBase58() === "So11111111111111111111111111111111111111112") return solUsdPrice ?? coin.quoteUsdPrice ?? null;
+    return coin.quoteUsdPrice ?? null;
+  }
+
   function marketCapLabel(coin: OnChainCoin): string {
     // Prefer the coin's own real quote-asset USD price (from our backend,
     // correct for SOL, SPCX, or any future quote) over the global SOL
     // price — that fallback only applies when per-coin data isn't
     // available yet (e.g. a direct-RPC fetch that skipped the backend).
-    const usdPrice = coin.quoteUsdPrice ?? solUsdPrice;
+    const usdPrice = usdPriceFor(coin);
     if (usdPrice == null) return "—";
-    const capUsd = coin.priceInSol * TOTAL_SUPPLY_UI * usdPrice;
+    const capUsd = coin.priceInSol * (coin.totalSupply ?? TOTAL_SUPPLY_UI) * usdPrice;
     return usdFmt.format(capUsd);
   }
 
   function volLabel(coin: OnChainCoin): string {
-    const usdPrice = coin.quoteUsdPrice ?? solUsdPrice;
+    const usdPrice = usdPriceFor(coin);
     if (coin.volume24hQuote == null || usdPrice == null) return "—";
     return usdFmt.format(coin.volume24hQuote * usdPrice);
   }
@@ -410,7 +440,7 @@ export default function App() {
     .sort((a, b) => {
       if (filter === "new") return b.createdAt - a.createdAt;
       if (filter === "volume") {
-        const usd = (c: OnChainCoin) => (c.volume24hQuote ?? 0) * (c.quoteUsdPrice ?? solUsdPrice ?? 0);
+        const usd = (c: OnChainCoin) => (c.volume24hQuote ?? 0) * (usdPriceFor(c) ?? 0);
         return usd(b) - usd(a);
       }
       return Number(b.quoteReserveLamports) - Number(a.quoteReserveLamports);
@@ -451,7 +481,16 @@ export default function App() {
     };
   }, [view, selectedMint, connection]);
 
-  const rawSelected = freshSelectedCoin ?? coins.find((c) => c.mint.toBase58() === selectedMint);
+  const selectedListCoin = coins.find((c) => c.mint.toBase58() === selectedMint);
+  // Live chain data lacks backend-only fields (quote USD price, 24h volume, verified); keep them from the coin list
+  const rawSelected = freshSelectedCoin
+    ? {
+        ...freshSelectedCoin,
+        quoteUsdPrice: freshSelectedCoin.quoteUsdPrice ?? selectedListCoin?.quoteUsdPrice,
+        volume24hQuote: freshSelectedCoin.volume24hQuote ?? selectedListCoin?.volume24hQuote,
+        verified: selectedListCoin?.verified,
+      }
+    : selectedListCoin;
 
   const [dammPriceInSol, setDammPriceInSol] = useState<number | null>(null);
   const [dammPoolAddress, setDammPoolAddress] = useState<string | null>(null);
@@ -1241,7 +1280,7 @@ export default function App() {
   {(() => {
     const quoteToken = getQuoteTokenByMint(selected.quoteMint);
     const quoteSym = quoteSymbolFor(selected);
-    const usdPrice = selected.quoteUsdPrice ?? solUsdPrice;
+    const usdPrice = usdPriceFor(selected);
     const dayAgo = Math.floor(Date.now() / 1000) - 86400;
 
     const vol24hQuote = trades
@@ -1375,9 +1414,10 @@ export default function App() {
       <TokenChart
         trades={trades}
         priceInSol={selected.priceInSol}
-        usdPrice={selected.quoteUsdPrice ?? solUsdPrice}
+        usdPrice={usdPriceFor(selected)}
         quoteSymbol={quoteSymbolFor(selected)}
         loading={chartLoading}
+        totalSupply={selected.totalSupply}
       />
       <div className="card trades-card">
         <div className="card-head">
@@ -1389,7 +1429,7 @@ export default function App() {
         </div>
         {(() => {
           const shown = trades.slice(0, tradesShown);
-          const usdPrice = selected.quoteUsdPrice ?? solUsdPrice;
+          const usdPrice = usdPriceFor(selected);
           const quoteSym = quoteSymbolFor(selected);
 
           if (shown.length === 0) {
@@ -1510,7 +1550,7 @@ export default function App() {
           const estimatedReceive = selected.priceInSol > 0
             ? (tab === "buy" ? typedAmount / selected.priceInSol : typedAmount * selected.priceInSol)
             : 0;
-          const usdPrice = selected.quoteUsdPrice ?? solUsdPrice;
+          const usdPrice = usdPriceFor(selected);
           const estimatedUsd = usdPrice != null ? (tab === "buy" ? typedAmount * usdPrice : estimatedReceive * usdPrice) : null;
 
           return (
@@ -1628,7 +1668,7 @@ export default function App() {
         <p className="card-copy">~1% of every trade on a Mintiq launch is paid straight to its creator &mdash; before graduation and forever after. No cliff, no expiry, and no extra tax on holders.</p>
         {(() => {
           const quoteSym = quoteSymbolFor(selected);
-          const usdPrice = selected.quoteUsdPrice ?? solUsdPrice;
+          const usdPrice = usdPriceFor(selected);
           const paidLabel = `${totalClaimedSol.toFixed(4)} ${quoteSym}`;
 
           const unclaimedRaw = selected.migrated

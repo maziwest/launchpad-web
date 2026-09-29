@@ -144,6 +144,7 @@ export interface OnChainCoin {
   priceInSol: number; // real price, derived from sqrtPrice
   quoteMint: PublicKey; // real quote asset for this coin — SOL for most, a stock token for others
   quoteDecimals: number; // real decimals of quoteMint, read on-chain — never assumed
+  totalSupply?: number; // real UI supply, drops as tokens are burned
   verified?: boolean; // granted from the admin dashboard, stored in our backend
   volume24hQuote?: number; // 24h traded volume in the quote asset, from our backend indexer
   quoteUsdPrice?: number; // real, live USD price of the quote asset, from our backend (Backpack's ticker API) — undefined when using a direct-RPC path that doesn't have this
@@ -205,6 +206,7 @@ export async function fetchCoin(connection: Connection, mint: PublicKey): Promis
   ]);
   const quoteMint = new PublicKey((poolConfig as any).quoteMint);
   const quoteDecimals = await fetchQuoteMintDecimals(connection, quoteMint);
+  const supplyInfo = await connection.getTokenSupply(mint).catch(() => null); // live, reflects burns
   const priceDecimal = getPriceFromSqrtPrice(p.sqrtPrice, TokenDecimal.SIX, quoteDecimals);
   const migrationThresholdLamports = BigInt(new BN((poolConfig as any).migrationQuoteThreshold).toString());
   return {
@@ -219,6 +221,7 @@ export async function fetchCoin(connection: Connection, mint: PublicKey): Promis
     priceInSol: Number(priceDecimal.toString()),
     quoteMint,
     quoteDecimals,
+    totalSupply: supplyInfo?.value.uiAmount ?? undefined,
     complete: new BN(p.quoteReserve).gte(new BN(migrationThresholdLamports.toString())),
     migrated: Boolean(p.isMigrated),
     createdAt: new BN(p.activationPoint).toNumber(),
@@ -935,6 +938,7 @@ export async function fetchAllCoinsFromApi(): Promise<OnChainCoin[]> {
     quoteDecimals: r.quote_decimals,
     quoteUsdPrice: r.quote_usd_price != null ? Number(r.quote_usd_price) : undefined,
     verified: r.verified === true,
+    totalSupply: r.total_supply_raw != null ? Number(r.total_supply_raw) / 1e6 : undefined,
     volume24hQuote: r.volume_24h_raw != null ? Number(r.volume_24h_raw) / 10 ** (r.quote_decimals ?? 9) : undefined,
     complete: BigInt(r.quote_reserve_lamports) >= BigInt(r.migration_threshold_lamports),
     migrated: r.migrated,

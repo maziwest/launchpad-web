@@ -55,6 +55,8 @@ interface Props {
   usdPrice: number | null;
   quoteSymbol: string;
   loading: boolean;
+  /** Real current supply (after burns); falls back to 1B. */
+  totalSupply?: number;
 }
 
 const W = 900;
@@ -63,7 +65,8 @@ const PAD_T = 16;
 const PAD_B = 16;
 const PAD_R = 82;
 
-export default function TokenChart({ trades, priceInSol, usdPrice, quoteSymbol, loading }: Props) {
+export default function TokenChart({ trades, priceInSol, usdPrice, quoteSymbol, loading, totalSupply }: Props) {
+  const supply = totalSupply ?? TOTAL_SUPPLY_UI;
   const [series, setSeries] = useState<"price" | "mcap">("price");
   const [tf, setTf] = useState<string>("1D");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
@@ -85,10 +88,10 @@ export default function TokenChart({ trades, priceInSol, usdPrice, quoteSymbol, 
     return inWindow.map((t) => {
       // Market cap is the same real price scaled by the fixed supply, so
       // both series come from one source of truth rather than two.
-      const inQuote = series === "mcap" ? t.priceInSol * TOTAL_SUPPLY_UI : t.priceInSol;
+      const inQuote = series === "mcap" ? t.priceInSol * supply : t.priceInSol;
       return { time: t.timestamp, value: usdPrice != null ? inQuote * usdPrice : inQuote };
     });
-  }, [trades, tf, series, usdPrice]);
+  }, [trades, tf, series, usdPrice, supply]);
 
   const isUsd = usdPrice != null;
   const formatValue = (v: number) =>
@@ -126,7 +129,7 @@ export default function TokenChart({ trades, priceInSol, usdPrice, quoteSymbol, 
   // A single trade can't draw a line, and an empty window shouldn't render
   // a misleading flat one — say so plainly instead.
   if (data.length < 2) {
-    const live = series === "mcap" ? priceInSol * TOTAL_SUPPLY_UI : priceInSol;
+    const live = series === "mcap" ? priceInSol * supply : priceInSol;
     const liveValue = usdPrice != null ? live * usdPrice : live;
     return (
       <div className="card chart-card">
