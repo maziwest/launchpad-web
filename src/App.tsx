@@ -306,11 +306,10 @@ export default function App() {
 
   const [launchCostSol, setLaunchCostSol] = useState<number | null>(null);
   useEffect(() => {
-    if (coins.length === 0) return;
-    estimateLaunchCostSol(connection, coins)
+    estimateLaunchCostSol(connection)
       .then(setLaunchCostSol)
-      .catch((err) => console.error("Couldn't measure real launch cost:", err));
-  }, [coins.length > 0, connection]);
+      .catch((err) => console.error("Couldn't calculate launch cost:", err));
+  }, [connection]);
 
   // Hero card: official $MQ token, live data
   // $MQ was launched via CLI without socials in its metadata; fallback until metadata is updated on-chain

@@ -808,18 +808,21 @@ export function buildCandles(trades: Pick<TradeEvent, "timestamp" | "priceInSol"
  * exact balance change in that transaction is the real, ground-truth cost,
  * not a guess.
  */
-export async function estimateLaunchCostSol(connection: Connection, sampleCoins: OnChainCoin[]): Promise<number | null> {
-  if (sampleCoins.length === 0) return null;
-  const poolAddress = sampleCoins[0].poolAddress;
-  const signatures = await connection.getSignaturesForAddress(poolAddress, { limit: 1000 });
-  if (signatures.length === 0) return null;
-
-  const creationSig = signatures[signatures.length - 1].signature; // oldest = the pool's actual creation tx
-  const tx = await connection.getTransaction(creationSig, { maxSupportedTransactionVersion: 0 });
-  if (!tx?.meta) return null;
-
-  const spentLamports = tx.meta.preBalances[0] - tx.meta.postBalances[0]; // account 0 is always the fee payer
-  return spentLamports / LAMPORTS_PER_SOL;
+/**
+ * What launching one coin costs, calculated rather than sampled, so it works from the very first launch.
+ * A DBC launch creates 5 accounts, each needing rent: token mint (82 bytes), pool (424), metadata (607),
+ * and 2 vaults (165 each). Sizes are fixed by the programs; rent is read live from the network.
+ * Plus the transaction fee (with a margin for priority fees). Image/metadata upload is quoted separately.
+ */
+const LAUNCH_ACCOUNT_SIZES = [82, 424, 607, 165, 165];
+export async function estimateLaunchCostSol(connection: Connection, _sampleCoins?: OnChainCoin[]): Promise<number | null> {
+  try {
+    const rents = await Promise.all(LAUNCH_ACCOUNT_SIZES.map((size) => connection.getMinimumBalanceForRentExemption(size)));
+    const feesLamports = 50_000;
+    return (rents.reduce((a, b) => a + b, 0) + feesLamports) / LAMPORTS_PER_SOL;
+  } catch {
+    return null;
+  }
 }
 
 export interface DashboardStats {
@@ -1159,4 +1162,28 @@ export async function setCoinVerifiedApi(mint: string, verified: boolean, authTo
   });
   if (res.status === 401 || res.status === 403) throw new Error("Not authorized, log in to the admin dashboard again");
   if (!res.ok) throw new Error(`verify API ${res.status}`);
+}
+
+/**
+ * On-chain launchpad profile (name, website, logo) attached to the platform's fee-claimer wallet,
+ * so trading apps can show "Minti Q" instead of the generic program name. Signed by that wallet.
+ */
+export async function createPlatformProfile(
+  connection: Connection,
+  wallet: AnchorProvider["wallet"],
+  name: string,
+  website: string,
+  logo: string
+) {
+  const client: any = getDbcClient(connection);
+  const svc = client.partner ?? client.partnerService;
+  if (!svc?.createPartnerMetadata) throw new Error("This SDK version has no createPartnerMetadata");
+  const tx = await svc.createPartnerMetadata({ name, website, logo, feeClaimer: wallet.publicKey, payer: wallet.publicKey });
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = wallet.publicKey;
+  const signed = await wallet.signTransaction(tx);
+  const signature = await connection.sendRawTransaction(signed.serialize());
+  await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+  return signature;
 }

@@ -1,3 +1,4 @@
+import AdminPlatformProfile from "./AdminPlatformProfile";
 import { EXPLORER_SUFFIX } from "./lib/network";
 import AdminLockLp from "./AdminLockLp";
 import React, { useState } from "react";
@@ -553,6 +554,8 @@ export default function AdminClaimPage() {
       )}
 
       <hr style={{ margin: "40px 0", border: "none", borderTop: "1px solid #2a3a33" }} />
+
+      <AdminPlatformProfile />
 
       <AdminLockLp />
 
