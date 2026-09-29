@@ -1,3 +1,4 @@
+import MqBurnCard from "./MqBurnCard";
 import BurnPage from "./BurnPage";
 import { PAIR_CATEGORIES } from "./lib/quote-tokens";
 import { fetchTradesFromApi, fetchClaimsFromApi } from "./lib/program-dbc";
@@ -1657,7 +1658,16 @@ export default function App() {
           );
         })()}
       </div>
-      <div className="card royalty-card">
+      {selected.mint.toBase58() === "7DTLTsUpAYpvR1CuPmYddWuCPyjik4MVR8WJ1rM5cfMy" && (
+        <MqBurnCard
+          priceUsd={usdPriceFor(selected) != null ? selected.priceInSol * usdPriceFor(selected)! : null}
+          onViewAll={() => setView("burn")}
+        />
+      )}
+      <div
+        className="card royalty-card"
+        style={selected.mint.toBase58() === "7DTLTsUpAYpvR1CuPmYddWuCPyjik4MVR8WJ1rM5cfMy" ? { display: "none" } : undefined}
+      >
         <div className="card-head">
           <div className="card-head-icon">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l2.4 6.8L21 11l-6.6 2.2L12 20l-2.4-6.8L3 11l6.6-2.2Z"/></svg>
