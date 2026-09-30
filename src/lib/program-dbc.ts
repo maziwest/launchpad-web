@@ -1199,3 +1199,90 @@ export async function createPlatformProfile(
   await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
   return signature;
 }
+
+/**
+ * Sells a coin quoted in something other than SOL (e.g. SPCXx) and pays the seller native SOL:
+ * coin -> quote token on the curve, then quote token -> SOL via Jupiter. One transaction when it fits,
+ * otherwise two (sell, then swap). The Jupiter leg spends only the curve's GUARANTEED minimum output,
+ * so it can never ask for more quote token than the sell delivered; any small extra stays as dust.
+ */
+export async function sellToSol(
+  connection: Connection,
+  wallet: AnchorProvider["wallet"],
+  poolAddress: PublicKey,
+  quoteMint: PublicKey,
+  tokenAmountRaw: bigint,
+  slippageBps: number = 100
+): Promise<string> {
+  const client = getDbcClient(connection);
+
+  // 1) Curve leg: coin -> quote token, with slippage protection
+  const curveQuote = await quoteTrade(connection, poolAddress, tokenAmountRaw, true, slippageBps);
+  const guaranteedQuote = curveQuote.minimumAmountOut;
+  if (guaranteedQuote <= 0n) throw new Error("Amount too small to sell");
+  const dbcTx = await client.pool.swap({
+    owner: wallet.publicKey,
+    pool: poolAddress,
+    amountIn: new BN(tokenAmountRaw.toString()),
+    minimumAmountOut: new BN(guaranteedQuote.toString()),
+    swapBaseForQuote: true,
+    referralTokenAccount: null,
+  } as any);
+
+  // 2) Jupiter leg: exactly the guaranteed quote-token amount -> native SOL
+  const jqRes = await fetch(
+    `https://lite-api.jup.ag/swap/v1/quote?inputMint=${quoteMint.toBase58()}&outputMint=${QUOTE_MINT.toBase58()}&amount=${guaranteedQuote.toString()}&slippageBps=${slippageBps}`
+  );
+  if (!jqRes.ok) throw new Error("Failed to get Jupiter quote to SOL");
+  const jupQuote = await jqRes.json();
+  const ixRes = await fetch("https://lite-api.jup.ag/swap/v1/swap-instructions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ quoteResponse: jupQuote, userPublicKey: wallet.publicKey.toBase58(), wrapAndUnwrapSol: true }),
+  });
+  if (!ixRes.ok) throw new Error("Failed to get Jupiter swap instructions");
+  const ixData = await ixRes.json();
+  const de = (ix: any) =>
+    new TransactionInstruction({
+      programId: new PublicKey(ix.programId),
+      keys: ix.accounts.map((a: any) => ({ pubkey: new PublicKey(a.pubkey), isSigner: a.isSigner, isWritable: a.isWritable })),
+      data: Buffer.from(ix.data, "base64"),
+    });
+  const jupIxs: TransactionInstruction[] = [
+    ...(ixData.setupInstructions || []).map(de),
+    de(ixData.swapInstruction),
+    ...(ixData.cleanupInstruction ? [de(ixData.cleanupInstruction)] : []),
+  ];
+  const alts: AddressLookupTableAccount[] = [];
+  for (const addr of ixData.addressLookupTableAddresses || []) {
+    const r = await connection.getAddressLookupTable(new PublicKey(addr));
+    if (r.value) alts.push(r.value);
+  }
+
+  const sendV0 = async (ixs: TransactionInstruction[]) => {
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    const tx = new VersionedTransaction(
+      new TransactionMessage({ payerKey: wallet.publicKey, recentBlockhash: blockhash, instructions: ixs }).compileToV0Message(alts)
+    );
+    const signed = await wallet.signTransaction(tx as any);
+    const signature = await connection.sendRawTransaction((signed as any).serialize());
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+    return signature;
+  };
+
+  // Try one transaction; if it's too big for Solana's size limit, split into sell then swap
+  const all = [...dbcTx.instructions, ...jupIxs];
+  let fits = false;
+  try {
+    const { blockhash } = await connection.getLatestBlockhash();
+    const probe = new VersionedTransaction(
+      new TransactionMessage({ payerKey: wallet.publicKey, recentBlockhash: blockhash, instructions: all }).compileToV0Message(alts)
+    );
+    fits = probe.serialize().length <= 1232;
+  } catch {
+    fits = false;
+  }
+  if (fits) return sendV0(all);
+  await finalizeAndSend(connection, wallet, dbcTx);
+  return sendV0(jupIxs);
+}

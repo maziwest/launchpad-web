@@ -1,3 +1,4 @@
+import { sellToSol } from "./lib/program-dbc";
 import { MQ_MINT, EXPLORER_SUFFIX } from "./lib/network";
 import MqBurnCard from "./MqBurnCard";
 import BurnPage from "./BurnPage";
@@ -607,14 +608,27 @@ export default function App() {
           const q: any = await quoteDammTrade(connection, pool, BigInt(Math.floor(amt * 10 ** inDec)), tab === "sell", slip);
           out = Number(q.outputAmount.toString()) / 10 ** outDec;
         } else {
-          const inDec = tab === "buy" ? coin.quoteDecimals : TOKEN_DECIMALS;
-          const outDec = tab === "buy" ? TOKEN_DECIMALS : coin.quoteDecimals;
-          const amountIn = BigInt(Math.floor(amt * 10 ** inDec));
-          const q =
-            tab === "buy"
-              ? await quotePartialFillTrade(connection, coin.poolAddress, amountIn, slip)
-              : await quoteTrade(connection, coin.poolAddress, amountIn, true, slip);
-          out = Number(q.outputAmount) / 10 ** outDec;
+          const viaSol = !coin.quoteMint.equals(QUOTE_MINT); // stock pairs: user pays and receives SOL
+          if (viaSol && tab === "buy") {
+            const jr = await fetch(`https://lite-api.jup.ag/swap/v1/quote?inputMint=${QUOTE_MINT.toBase58()}&outputMint=${coin.quoteMint.toBase58()}&amount=${Math.floor(amt * 1e9)}&slippageBps=${slip}`);
+            const jq = await jr.json();
+            const q = await quotePartialFillTrade(connection, coin.poolAddress, BigInt(jq.otherAmountThreshold), slip);
+            out = Number(q.outputAmount) / 10 ** TOKEN_DECIMALS;
+          } else if (viaSol && tab === "sell") {
+            const q = await quoteTrade(connection, coin.poolAddress, BigInt(Math.floor(amt * 10 ** TOKEN_DECIMALS)), true, slip);
+            const jr = await fetch(`https://lite-api.jup.ag/swap/v1/quote?inputMint=${coin.quoteMint.toBase58()}&outputMint=${QUOTE_MINT.toBase58()}&amount=${q.minimumAmountOut.toString()}&slippageBps=${slip}`);
+            const jq = await jr.json();
+            out = Number(jq.outAmount) / 1e9;
+          } else {
+            const inDec = tab === "buy" ? coin.quoteDecimals : TOKEN_DECIMALS;
+            const outDec = tab === "buy" ? TOKEN_DECIMALS : coin.quoteDecimals;
+            const amountIn = BigInt(Math.floor(amt * 10 ** inDec));
+            const q =
+              tab === "buy"
+                ? await quotePartialFillTrade(connection, coin.poolAddress, amountIn, slip)
+                : await quoteTrade(connection, coin.poolAddress, amountIn, true, slip);
+            out = Number(q.outputAmount) / 10 ** outDec;
+          }
         }
         if (!cancelled) setLiveQuote({ key, out });
       } catch (err) {
@@ -895,6 +909,13 @@ export default function App() {
         const quote = await quoteDammTrade(connection, pool, raw, true, Math.round(slippagePct * 100));
         const sig = await dammSell(connection, walletFor(), pool, raw, BigInt((quote.minimumAmountOut ?? quote.outputAmount).toString()));
         fireToast(`Sold — ${sig.slice(0, 8)}...`, "sell");
+        await refresh();
+        return;
+      }
+      // Coins quoted in something other than SOL (e.g. SPCXx): the seller receives native SOL
+      if (!coin.quoteMint.equals(QUOTE_MINT)) {
+        const sig = await sellToSol(connection, walletFor(), coin.poolAddress, coin.quoteMint, raw, Math.round(slippagePct * 100));
+        fireToast(`Sold for SOL — ${sig.slice(0, 8)}...`, "sell");
         await refresh();
         return;
       }
@@ -1605,18 +1626,23 @@ export default function App() {
 
         {(() => {
           const quoteToken = getQuoteTokenByMint(selected.quoteMint);
-          const payLabel = tab === "buy" ? quoteSymbolFor(selected) : selected.symbol;
-          const receiveLabel = tab === "buy" ? selected.symbol : quoteSymbolFor(selected);
+          const viaSolPair = !selected.quoteMint.equals(QUOTE_MINT) && !selected.migrated; // stock pairs on the curve trade in SOL
+          const payLabel = tab === "buy" ? (viaSolPair ? "SOL" : quoteSymbolFor(selected)) : selected.symbol;
+          const receiveLabel = tab === "buy" ? selected.symbol : (viaSolPair ? "SOL" : quoteSymbolFor(selected));
           const payBalance = tab === "buy" ? walletSolBalance : walletTokenBalance;
           const typedAmount = parseFloat(amount) || 0;
           const quoteKey = `${selected.mint.toBase58()}|${tab}|${amount}`;
           const quoteReady = !!liveQuote && liveQuote.key === quoteKey;
           const estimatedReceive = quoteReady ? liveQuote!.out : 0;
           // How much worse than the current price this trade is (price impact + trading fee)
-          const spotOut = selected.priceInSol > 0 ? (tab === "buy" ? typedAmount / selected.priceInSol : typedAmount * selected.priceInSol) : 0;
+          // Stock pairs: the user pays/receives SOL, so convert the quote-token price into SOL via USD prices
+          const quoteInSol = selected.quoteMint.equals(QUOTE_MINT) ? 1 : (usdPriceFor(selected) ?? 0) / (solUsdPrice ?? Infinity);
+          const priceSol = selected.priceInSol * quoteInSol;
+          const spotOut = priceSol > 0 ? (tab === "buy" ? typedAmount / priceSol : typedAmount * priceSol) : 0;
           const impactPct = quoteReady && spotOut > 0 ? Math.max(0, (1 - estimatedReceive / spotOut) * 100) : null;
           const usdPrice = usdPriceFor(selected);
-          const estimatedUsd = usdPrice != null ? (tab === "buy" ? typedAmount * usdPrice : estimatedReceive * usdPrice) : null;
+          const swapUsd = selected.quoteMint.equals(QUOTE_MINT) ? usdPrice : solUsdPrice; // stock pairs trade in SOL
+          const estimatedUsd = swapUsd != null ? (tab === "buy" ? typedAmount * swapUsd : estimatedReceive * swapUsd) : null;
 
           return (
             <>
