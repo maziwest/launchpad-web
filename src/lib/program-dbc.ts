@@ -1,3 +1,4 @@
+import { deriveTokenBadgeAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { API_BASE_URL, MQ_CONFIG_KEY_STR } from "./network";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction, AddressLookupTableAccount } from "@solana/web3.js";
@@ -246,6 +247,11 @@ export async function createCoin(
   const client = getDbcClient(connection);
   const mint = generateVanityKeypair("MQ");
 
+  // Badged quote tokens (e.g. xStocks) need their Meteora token badge passed along; SOL has none
+  const poolConfig: any = await client.state.getPoolConfig(configKey);
+  const badge = deriveTokenBadgeAddress(new PublicKey(poolConfig.quoteMint));
+  const hasBadge = !!(await connection.getAccountInfo(badge));
+
   const tx = await client.creator.createPool({
     name,
     symbol,
@@ -254,7 +260,8 @@ export async function createCoin(
     poolCreator: wallet.publicKey,
     config: configKey,
     baseMint: mint.publicKey,
-  });
+    ...(hasBadge ? { tokenBadge: badge } : {}),
+  } as any);
 
   const sig = await finalizeAndSend(connection, wallet, tx, [mint]);
 
