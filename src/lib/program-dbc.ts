@@ -1041,15 +1041,20 @@ export async function buyWithSol(
   // will actually output. Partial-fill means we can safely send a bit more
   // than the exact expected amount as a buffer — it never overspends past
   // what the curve can take.
-  const expectedQuoteOut = BigInt(jupQuote.outAmount);
+  // Spend Jupiter's GUARANTEED minimum output (after slippage), never the optimistic quote:
+  // the swap can land slightly below the quote, and the curve leg must never ask for more than arrived.
+  // Any small extra the swap delivers stays in the buyer's wallet as quote-token dust.
+  const guaranteedQuoteOut = BigInt(jupQuote.otherAmountThreshold);
+  // Slippage protection on the curve leg too (no more minimumAmountOut = 0)
+  const dbcQuote = await quotePartialFillTrade(connection, poolAddress, guaranteedQuoteOut, slippageBps);
   const client = getDbcClient(connection);
   const dbcTx = await client.pool.swap2({
     owner: wallet.publicKey,
     pool: poolAddress,
     swapBaseForQuote: false,
     swapMode: SwapMode.PartialFill,
-    amountIn: new BN(expectedQuoteOut.toString()),
-    minimumAmountOut: new BN(0), // caller should pass a real slippage-derived minimum in production
+    amountIn: new BN(guaranteedQuoteOut.toString()),
+    minimumAmountOut: new BN(dbcQuote.minimumAmountOut.toString()),
     referralTokenAccount: null,
   });
 
