@@ -31,6 +31,18 @@ export const QUOTE_TOKEN_OPTIONS: QuoteTokenOption[] = [
     category: "Solana",
     imageUrl: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
   },
+  // SpaceX xStock by xStocks (Backed). Mainnet only. Token-2022, 8 decimals, Meteora token badge.
+  ...((IS_MAINNET ? [
+    {
+      mint: new PublicKey("Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8"),
+      configKey: new PublicKey("CPezBxqjHb285tMynvizRnjCZ5cbdZN6Bc5rnhPZX5bN"),
+      symbol: "SPCXx",
+      displayName: "SpaceX xStock",
+      decimals: 8,
+      category: "xStocks",
+      imageUrl: "https://xstocks-metadata.backed.fi/logos/tokens/SPCXx.png",
+    },
+  ] : []) as QuoteTokenOption[]),
   // Devnet-only test quote token; never shown on mainnet
   ...((IS_MAINNET ? [] : [
     {
