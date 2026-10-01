@@ -1,3 +1,4 @@
+import type { Transaction } from "@solana/web3.js";
 import { deriveTokenBadgeAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { API_BASE_URL, MQ_CONFIG_KEY_STR } from "./network";
 import { AnchorProvider } from "@coral-xyz/anchor";
@@ -561,7 +562,7 @@ export async function claimCreatorFee(
     maxBaseAmount,
     maxQuoteAmount,
   });
-  return finalizeAndSend(connection, wallet, tx);
+  return sendClaimAsSol(connection, wallet, tx, p, maxQuoteAmount);
 }
 
 /**
@@ -595,7 +596,7 @@ export async function claimPartnerFee(
     maxQuoteAmount,
     receiver: wallet.publicKey,
   });
-  return finalizeAndSend(connection, wallet, tx);
+  return sendClaimAsSol(connection, wallet, tx, p, maxQuoteAmount);
 }
 
 export interface TradeEvent {
@@ -1284,5 +1285,87 @@ export async function sellToSol(
   }
   if (fits) return sendV0(all);
   await finalizeAndSend(connection, wallet, dbcTx);
+  return sendV0(jupIxs);
+}
+
+/**
+ * Sends a fee-claim transaction. For pools quoted in something other than SOL (e.g. SPCXx), converts the
+ * claimed quote tokens to native SOL via Jupiter in the same transaction (split into two if it won't fit).
+ * The claimed amount is known exactly (the pool records it), so the swap spends precisely that.
+ * If Jupiter can't route the amount (e.g. dust), falls back to a plain claim so claiming is never blocked.
+ */
+async function sendClaimAsSol(
+  connection: Connection,
+  wallet: AnchorProvider["wallet"],
+  claimTx: Transaction,
+  poolState: any,
+  quoteAmount: BN,
+  slippageBps: number = 100
+): Promise<string> {
+  const client = getDbcClient(connection);
+  const cfg: any = await client.state.getPoolConfig(new PublicKey(poolState.config));
+  const quoteMint = new PublicKey(cfg.quoteMint);
+  if (quoteMint.equals(QUOTE_MINT) || quoteAmount.isZero()) return finalizeAndSend(connection, wallet, claimTx);
+
+  let jupIxs: TransactionInstruction[] = [];
+  const alts: AddressLookupTableAccount[] = [];
+  try {
+    const jq = await fetch(
+      `https://lite-api.jup.ag/swap/v1/quote?inputMint=${quoteMint.toBase58()}&outputMint=${QUOTE_MINT.toBase58()}&amount=${quoteAmount.toString()}&slippageBps=${slippageBps}`
+    );
+    if (!jq.ok) throw new Error("no Jupiter quote");
+    const jupQuote = await jq.json();
+    if (!jupQuote?.outAmount) throw new Error("no Jupiter route");
+    const ixRes = await fetch("https://lite-api.jup.ag/swap/v1/swap-instructions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quoteResponse: jupQuote, userPublicKey: wallet.publicKey.toBase58(), wrapAndUnwrapSol: true }),
+    });
+    if (!ixRes.ok) throw new Error("no Jupiter instructions");
+    const ixData = await ixRes.json();
+    const de = (ix: any) =>
+      new TransactionInstruction({
+        programId: new PublicKey(ix.programId),
+        keys: ix.accounts.map((a: any) => ({ pubkey: new PublicKey(a.pubkey), isSigner: a.isSigner, isWritable: a.isWritable })),
+        data: Buffer.from(ix.data, "base64"),
+      });
+    jupIxs = [
+      ...(ixData.setupInstructions || []).map(de),
+      de(ixData.swapInstruction),
+      ...(ixData.cleanupInstruction ? [de(ixData.cleanupInstruction)] : []),
+    ];
+    for (const addr of ixData.addressLookupTableAddresses || []) {
+      const r = await connection.getAddressLookupTable(new PublicKey(addr));
+      if (r.value) alts.push(r.value);
+    }
+  } catch (err) {
+    console.warn("Claim-as-SOL conversion unavailable, claiming in the quote token instead:", err);
+    return finalizeAndSend(connection, wallet, claimTx);
+  }
+
+  const sendV0 = async (ixs: TransactionInstruction[]) => {
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    const tx = new VersionedTransaction(
+      new TransactionMessage({ payerKey: wallet.publicKey, recentBlockhash: blockhash, instructions: ixs }).compileToV0Message(alts)
+    );
+    const signed = await wallet.signTransaction(tx as any);
+    const signature = await connection.sendRawTransaction((signed as any).serialize());
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+    return signature;
+  };
+
+  const all = [...claimTx.instructions, ...jupIxs];
+  let fits = false;
+  try {
+    const { blockhash } = await connection.getLatestBlockhash();
+    const probe = new VersionedTransaction(
+      new TransactionMessage({ payerKey: wallet.publicKey, recentBlockhash: blockhash, instructions: all }).compileToV0Message(alts)
+    );
+    fits = probe.serialize().length <= 1232;
+  } catch {
+    fits = false;
+  }
+  if (fits) return sendV0(all);
+  await finalizeAndSend(connection, wallet, claimTx);
   return sendV0(jupIxs);
 }
