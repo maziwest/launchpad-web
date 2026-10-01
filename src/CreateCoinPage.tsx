@@ -402,7 +402,7 @@ export default function CreateCoinPage({
           <div className="summary-row">
             <span className="summary-label">Creator royalty &rarr; forever</span>
             <span className="summary-value">
-              {configSummary ? `~${configSummary.creatorRoyaltyPct.toFixed(3)}% per trade` : configError ? "—" : "…"}
+              {configSummary ? `~${configSummary.creatorRoyaltyPct.toFixed(3)}% per trade${quoteToken.mint.toBase58() !== "So11111111111111111111111111111111111111112" ? ", paid in SOL" : ""}` : configError ? "—" : "…"}
             </span>
           </div>
           <div className="summary-row" style={{ borderBottom: "none" }}>

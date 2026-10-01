@@ -1774,6 +1774,7 @@ export default function App() {
         {(() => {
           const quoteSym = quoteSymbolFor(selected);
           const usdPrice = usdPriceFor(selected);
+          const paidInSol = !selected.quoteMint.equals(QUOTE_MINT) && !selected.migrated; // stock pairs: claims convert to SOL
           const paidLabel = `${totalClaimedSol.toFixed(4)} ${quoteSym}`;
 
           const unclaimedRaw = selected.migrated
@@ -1791,7 +1792,7 @@ export default function App() {
                 <div className="stat-pair">
                   <span className="stat-pair-label">Last payout</span>
                   <span className="stat-pair-value">{lastClaim ? `${(Number(lastClaim.amountLamports) / 10 ** selected.quoteDecimals).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${quoteSym}` : "—"}</span>
-                  <span className="stat-pair-sub">{lastClaim?.timestamp ? agoLabel(lastClaim.timestamp) : `paid in ${quoteSym}`}</span>
+                  <span className="stat-pair-sub">{lastClaim?.timestamp ? agoLabel(lastClaim.timestamp) : paidInSol ? "paid out in SOL" : `paid in ${quoteSym}`}</span>
                 </div>
               </div>
               <div className="royalty-wallet-row">
@@ -1819,6 +1820,11 @@ export default function App() {
                   {formatQuoteAmount(unclaimedRaw, selected)} {quoteSym}
                 </span>
               </div>
+              {paidInSol && (
+                <div style={{ fontSize: 12, color: "#8FA3A8", marginTop: 8, lineHeight: 1.5 }}>
+                  Paid out in SOL: royalties build up in {quoteSym} and are converted to SOL when you claim.
+                </div>
+              )}
               {isCreator && !selected.migrated && selected.creatorUnclaimedFeeLamports > 0n && (
                 <button
                   type="button"
@@ -1827,7 +1833,7 @@ export default function App() {
                   onClick={() => handleClaim(selected)}
                   disabled={loading}
                 >
-                  {loading ? "..." : "Claim your fees"}
+                  {loading ? "..." : paidInSol ? "Claim your fees in SOL" : "Claim your fees"}
                 </button>
               )}
               {isCreator && selected.migrated && ((selected as any).dbcLeftoverFeeLamports ?? 0n) > 0n && (
