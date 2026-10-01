@@ -43,6 +43,18 @@ export const QUOTE_TOKEN_OPTIONS: QuoteTokenOption[] = [
       imageUrl: "https://xstocks-metadata.backed.fi/logos/tokens/SPCXx.png",
     },
   ] : []) as QuoteTokenOption[]),
+  // Nasdaq xStock (tracks Invesco QQQ) by xStocks (Backed). Mainnet only. Token-2022, 8 decimals, Meteora token badge.
+  ...((IS_MAINNET ? [
+    {
+      mint: new PublicKey("Xs8S1uUs1zvS2p7iwtsG3b6fkhpvmwz4GYU3gWAmWHZ"),
+      configKey: new PublicKey("GytJnjPzDeYgQQ3SEJsVFS6C46K7iV8M8fTXbrksiSoi"),
+      symbol: "QQQx",
+      displayName: "Nasdaq xStock",
+      decimals: 8,
+      category: "xStocks",
+      imageUrl: "https://xstocks-metadata.backed.fi/logos/tokens/QQQx.png",
+    },
+  ] : []) as QuoteTokenOption[]),
   // Devnet-only test quote token; never shown on mainnet
   ...((IS_MAINNET ? [] : [
     {
