@@ -55,6 +55,18 @@ export const QUOTE_TOKEN_OPTIONS: QuoteTokenOption[] = [
       imageUrl: "https://xstocks-metadata.backed.fi/logos/tokens/QQQx.png",
     },
   ] : []) as QuoteTokenOption[]),
+  // Alphabet xStock by xStocks (Backed). Mainnet only. Token-2022, 8 decimals, Meteora token badge.
+  ...((IS_MAINNET ? [
+    {
+      mint: new PublicKey("XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN"),
+      configKey: new PublicKey("67xr9s3FdjqYgNY7q33zqdacXZhPKYq2yoJBeMPuXGYF"),
+      symbol: "GOOGLx",
+      displayName: "Alphabet xStock",
+      decimals: 8,
+      category: "xStocks",
+      imageUrl: "https://xstocks-metadata.backed.fi/logos/tokens/GOOGLx.png",
+    },
+  ] : []) as QuoteTokenOption[]),
   // Devnet-only test quote token; never shown on mainnet
   ...((IS_MAINNET ? [] : [
     {
