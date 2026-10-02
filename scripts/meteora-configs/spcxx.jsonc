@@ -1,0 +1,69 @@
+{
+  "rpcUrl": "https://api.mainnet-beta.solana.com",
+  "dryRun": true,
+  "keypairFilePath": "/home/west/mainnet-keys/deployer.json",
+  "computeUnitPriceMicroLamports": 100000,
+  "quoteMint": "Xs3oZwbHvqis4NYcf4YKWmEia2eC84wSiVrcYcTqpH8",
+  "dbcConfig": {
+    "buildCurveMode": 0,
+    "percentageSupplyOnMigration": 20,
+    "migrationQuoteThreshold": 68,
+    "token": {
+      "totalTokenSupply": 1000000000,
+      "tokenBaseDecimal": 6,
+      "tokenQuoteDecimal": 8,
+      "tokenType": 0,
+      "tokenAuthorityOption": 1,
+      "leftover": 0
+    },
+    "fee": {
+      "baseFeeParams": {
+        "baseFeeMode": 0,
+        "feeSchedulerParam": {
+          "startingFeeBps": 200,
+          "endingFeeBps": 200,
+          "numberOfPeriod": 0,
+          "totalDuration": 0
+        }
+      },
+      "dynamicFeeEnabled": false,
+      "collectFeeMode": 0,
+      "creatorTradingFeePercentage": 62,
+      "poolCreationFee": 0,
+      "enableFirstSwapWithMinFee": false
+    },
+    "migration": {
+      "migrationOption": 1,
+      "migrationFeeOption": 2,
+      "migrationFee": {
+        "feePercentage": 0,
+        "creatorFeePercentage": 0
+      }
+    },
+    "liquidityDistribution": {
+      "partnerLiquidityPercentage": 0,
+      "creatorLiquidityPercentage": 0,
+      "partnerPermanentLockedLiquidityPercentage": 70,
+      "creatorPermanentLockedLiquidityPercentage": 30
+    },
+    "lockedVesting": {
+      "totalLockedVestingAmount": 0,
+      "numberOfVestingPeriod": 0,
+      "cliffUnlockAmount": 0,
+      "totalVestingDuration": 0,
+      "cliffDurationFromMigrationTime": 0
+    },
+    "activationType": 1,
+    "leftoverReceiver": "HVJweDmPS5jgrb49fL4Q7U3wRAJfZcs3AL7cBW3nVdX5",
+    "feeClaimer": "HVJweDmPS5jgrb49fL4Q7U3wRAJfZcs3AL7cBW3nVdX5"
+  },
+  "dbcPool": {
+    "creator": "A6qSsE2W95V3tGHSmH4TjVm4MdigNYE9Krt8TVPpb2qy",
+    "name": "Minti Test",
+    "symbol": "MTEST",
+    "metadata": {
+      "image": "./data/image/minti-q-logo.jpeg",
+      "description": "Minti Q mainnet test coin. Not for trading."
+    }
+  }
+}

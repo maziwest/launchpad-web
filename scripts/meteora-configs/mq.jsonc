@@ -1,0 +1,72 @@
+{
+  "rpcUrl": "https://api.mainnet-beta.solana.com",
+  "dryRun": true,
+  "keypairFilePath": "/home/west/mainnet-keys/deployer.json",
+  "computeUnitPriceMicroLamports": 100000,
+  "quoteMint": "So11111111111111111111111111111111111111112",
+  "dbcConfig": {
+    "buildCurveMode": 0,
+    "percentageSupplyOnMigration": 20,
+    "migrationQuoteThreshold": 85,
+    "token": {
+      "totalTokenSupply": 1000000000,
+      "tokenBaseDecimal": 6,
+      "tokenQuoteDecimal": 9,
+      "tokenType": 0,
+      "tokenAuthorityOption": 1,
+      "leftover": 0
+    },
+    "fee": {
+      "baseFeeParams": {
+        "baseFeeMode": 0,
+        "feeSchedulerParam": {
+          "startingFeeBps": 200,
+          "endingFeeBps": 200,
+          "numberOfPeriod": 0,
+          "totalDuration": 0
+        }
+      },
+      "dynamicFeeEnabled": true,
+      "collectFeeMode": 0,
+      "creatorTradingFeePercentage": 38,
+      "poolCreationFee": 0,
+      "enableFirstSwapWithMinFee": false
+    },
+    "migration": {
+      "migrationOption": 1,
+      "migrationFeeOption": 3,
+      "migrationFee": {
+        "feePercentage": 0,
+        "creatorFeePercentage": 0
+      }
+    },
+    "liquidityDistribution": {
+      "partnerLiquidityPercentage": 0,
+      "creatorLiquidityPercentage": 0,
+      "partnerPermanentLockedLiquidityPercentage": 70,
+      "creatorPermanentLockedLiquidityPercentage": 30
+    },
+    "lockedVesting": {
+      "totalLockedVestingAmount": 0,
+      "numberOfVestingPeriod": 0,
+      "cliffUnlockAmount": 0,
+      "totalVestingDuration": 0,
+      "cliffDurationFromMigrationTime": 0
+    },
+    "activationType": 1,
+    "leftoverReceiver": "HVJweDmPS5jgrb49fL4Q7U3wRAJfZcs3AL7cBW3nVdX5",
+    "feeClaimer": "HVJweDmPS5jgrb49fL4Q7U3wRAJfZcs3AL7cBW3nVdX5"
+  },
+  "dbcPool": {
+    "creator": "CmCvHQKFgkUCyoyMeJ3dB84cfnmg1omBRsV3ALpyFWnj",
+    "name": "Minti Q",
+    "symbol": "MQ",
+    "metadata": {
+      "image": "./data/image/minti-q-logo.jpeg",
+      "description": "The official token of Minti Q, a Solana launchpad for coins paired with memes, stocks, currencies and commodities.",
+      "website": "https://mintiq.fun",
+      "twitter": "https://x.com/Mintiqdotfun",
+      "telegram": "https://t.me/mintiqdotfun"
+    }
+  }
+}
