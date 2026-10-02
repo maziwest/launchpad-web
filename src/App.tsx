@@ -793,6 +793,19 @@ export default function App() {
     if (!data.imageFile) return fireToast("An image is required", "error");
     try {
       setCreateStatus("Uploading image...");
+      console.log("[launch] socials from the form:", { website: data.website, twitter: data.twitter, telegram: data.telegram });
+      // X and Telegram take a handle only; the site builds the link
+      const cleanHandle = (v: string | undefined, label: string, min: number, max: number) => {
+        const t = (v ?? "").trim().replace(/^@/, "");
+        if (!t) return undefined;
+        if (!new RegExp(`^[A-Za-z0-9_]{${min},${max}}$`).test(t))
+          throw new Error(`${label}: enter your handle only (letters, numbers, underscore, ${min}-${max} characters), not a link`);
+        return t;
+      };
+      const xHandle = cleanHandle(data.twitter, "X", 1, 15);
+      const tgHandle = cleanHandle(data.telegram, "Telegram", 5, 32);
+      const siteRaw = (data.website ?? "").trim();
+      const websiteLink = siteRaw ? (/^https?:\/\//i.test(siteRaw) ? siteRaw : "https://" + siteRaw) : undefined;
       const imageUri = await uploadImage(wallet, data.imageFile);
 
       setCreateStatus("Uploading metadata...");
@@ -801,9 +814,9 @@ export default function App() {
         symbol: data.ticker,
         description: data.description,
         image: imageUri,
-        website: data.website || undefined,
-        twitter: data.twitter ? `https://x.com/${data.twitter}` : undefined,
-        telegram: data.telegram ? `https://t.me/${data.telegram}` : undefined,
+        website: websiteLink,
+        twitter: xHandle ? `https://x.com/${xHandle}` : undefined,
+        telegram: tgHandle ? `https://t.me/${tgHandle}` : undefined,
       });
 
       setCreateStatus("Launching coin...");
