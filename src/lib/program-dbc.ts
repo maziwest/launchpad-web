@@ -826,7 +826,7 @@ const LAUNCH_ACCOUNT_SIZES = [82, 424, 607, 165, 165];
 export async function estimateLaunchCostSol(connection: Connection, _sampleCoins?: OnChainCoin[]): Promise<number | null> {
   try {
     const rents = await Promise.all(LAUNCH_ACCOUNT_SIZES.map((size) => connection.getMinimumBalanceForRentExemption(size)));
-    const feesLamports = 50_000;
+    const feesLamports = 50_000 + 10_000_000; // network fee margin + Metaplex Token Metadata create fee (0.01 SOL)
     return (rents.reduce((a, b) => a + b, 0) + feesLamports) / LAMPORTS_PER_SOL;
   } catch {
     return null;
