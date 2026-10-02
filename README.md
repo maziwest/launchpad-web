@@ -45,7 +45,7 @@ Not yet tested: graduation of a stock-paired coin, and a production-size (85 SOL
 - `scripts/meteora-configs/`: the config recipes used to create the mainnet configs
 - `scripts/add-xstock.sh`: adds a new stock pairing (dry run, create, verify on chain, add to the site)
 - `scripts/studio-token-badge.patch`: passes the token badge when creating configs
-- Backend (API, trade indexer, buyback bot, launch signer): separate repo, https://github.com/Ucheubani4/mintiq-backend
+- Backend (API, trade indexer, buyback bot, launch signer): separate private repo (access for judges on request)
 
 ## Run locally
 
