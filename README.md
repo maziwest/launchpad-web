@@ -34,7 +34,7 @@ A Solana token launchpad built on Meteora's Dynamic Bonding Curve (DBC). Live on
 ## What we verified on mainnet
 
 - **Full lifecycle on a 0.03 SOL test config**: launch, trading, curve completion, migration to DAMM v2 (pool 4t5o6hDAPBBDvsNxMmKPVUMsodPT8F3pNsZCreZazwhY, coin MQKudm2Hh2VhSC28vxUnG6pkQ7QeiJWy15FdXvEChDu), LP 100% locked, post-graduation sell, creator and platform fee claims. The production configs differ only in the graduation threshold.
-- **Stock-paired coin**: MARSCOIN (MQoynJQE19kRM1TswCsKTW4rp5ueSNKCe7eZjwaqoo2) on the SPCXx config. Buy with SOL (one transaction: SOL to USDC to SPCXx to coin) and sell back to SOL both work.
+- **Stock-paired coin**: MARSCOIN (MQoynJQE19kRM1TswCsKTW4rp5ueSNKCe7eZjwaqoo2) on the SPCXx config. Buy with SOL (one transaction: SOL to USDC to SPCXx to coin), sell back to SOL, and the creator's fee claim paid out in SOL all work. The platform's own fee claim in SOL is deployed but not yet tested live.
 
 Not yet tested: graduation of a stock-paired coin, and a production-size (85 SOL) graduation handled by Meteora's keepers.
 
@@ -44,7 +44,7 @@ Not yet tested: graduation of a stock-paired coin, and a production-size (85 SOL
 - `scripts/meteora-configs/`: the config recipes used to create the mainnet configs
 - `scripts/add-xstock.sh`: adds a new stock pairing (dry run, create, verify on chain, add to the site)
 - `scripts/studio-token-badge.patch`: passes the token badge when creating configs
-- Backend (API, trade indexer, buyback bot, launch signer): separate repo, mintiq-backend
+- Backend (API, trade indexer, buyback bot, launch signer): separate repo, https://github.com/Ucheubani4/mintiq-backend
 
 ## Run locally
 
