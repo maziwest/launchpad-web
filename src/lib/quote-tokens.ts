@@ -67,6 +67,18 @@ export const QUOTE_TOKEN_OPTIONS: QuoteTokenOption[] = [
       imageUrl: "https://xstocks-metadata.backed.fi/logos/tokens/GOOGLx.png",
     },
   ] : []) as QuoteTokenOption[]),
+  // DraftKings (Sunrise). Mainnet only. 6 decimals, Meteora token badges.
+  ...((IS_MAINNET ? [
+    {
+      mint: new PublicKey("DKNGQFNGQmoBdXSRGKJ8tTu7uPDasw5JDcfMmWniNfow"),
+      configKey: new PublicKey("28tnpJkVGxe2NZ4WaWQGV1YabeSzmuri9NsHQFJmiDQS"),
+      symbol: "DKNG",
+      displayName: "DraftKings",
+      decimals: 6,
+      category: "Sunrise",
+      imageUrl: "https://backpack.exchange/api/stock-logo/DKNG",
+    },
+  ] : []) as QuoteTokenOption[]),
   // Devnet-only test quote token; never shown on mainnet
   ...((IS_MAINNET ? [] : [
     {
