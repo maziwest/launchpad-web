@@ -30,6 +30,7 @@ A Solana token launchpad built on Meteora's Dynamic Bonding Curve (DBC). Live on
 - QQQx config (graduates at 13.5 QQQx, about 85 SOL): GytJnjPzDeYgQQ3SEJsVFS6C46K7iV8M8fTXbrksiSoi
 - Config creation transactions: SPCXx jupE6ZKJknA98pH8pJ2C1xt3oybkkNt5bkpSERgj25NHhMUAgDSN8hqmqAGa6Aisoq18KgJcf2FNZUXQbXFZedL, QQQx nFBLd8cEtsfverhG7gZZ1dG9TDCmximMUREfUYbUkoxWp2nMNGQxgVKjA3r5LuYGu9CNcxLUfP8vRt3R7ApnjPH
 - Partner profile transaction: 44qvGKGtar4tSxNtE1gZQW3YccWWtWUpxsZ5PsiRAbUVwsdNgRe4V5XkbenYzXqUgBjtLZkwGzfBpPGigwCAQ7d7
+- Stock-paired sell back to SOL (curve plus Jupiter in one transaction, one wallet approval): 4wMrYA5wJiJHs5a6DKKRDBjYHtji3qKFCBSviJuKfNb9jiNh2TWnLobozWyRTqEGgiUJSqFr9SicBg6mhXHGoJTX
 
 ## What we verified on mainnet
 
