@@ -4,11 +4,11 @@ A Solana token launchpad built on Meteora's Dynamic Bonding Curve (DBC). Live on
 
 ## What it does
 
-- **Free token launches** on a bonding curve that graduates to a Meteora DAMM v2 pool with liquidity permanently locked (70% platform, 30% creator).
+- **No launch fee** (creators pay only about 0.011 SOL of on-chain rent): tokens launch on a bonding curve that graduates to a Meteora DAMM v2 pool with liquidity permanently locked (70% platform, 30% creator).
 - **Creator royalties forever**: about 1% of every trade goes to the creator, before and after graduation.
 - **Stock-paired launches**: coins priced in tokenized stocks (SPCXx, QQQx from xStocks). Users only pay and receive SOL: a Jupiter swap is bundled with the curve trade in one transaction, and creator and platform fee claims are converted to SOL.
-- **Official token $MQ** with a buyback-and-burn bot.
-- **Launch signer**: every launch carries a common launchpad signer (E82kq7L8gy2jHniKNvNEBDQ81xicoKZpXdw6TrtDRwBx) so trading terminals can recognise Minti Q launches.
+- **Official token $MQ** with a buyback-and-burn bot (built and tested on devnet; mainnet launch pending).
+- **Launch signer**: every launch carries a common launchpad signer (E82kq7L8gy2jHniKNvNEBDQ81xicoKZpXdw6TrtDRwBx) so trading terminals can recognise Minti Q launches. It applies to new launches only; the first live launch with it is pending.
 
 ## How it uses Meteora
 
