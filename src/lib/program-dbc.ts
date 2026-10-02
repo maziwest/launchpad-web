@@ -985,9 +985,10 @@ export async function buyWithSol(
   solAmountLamports: bigint,
   slippageBps: number = 100
 ): Promise<string> {
+  const client = getDbcClient(connection);
+
   // Common case: the coin's quote IS SOL, so there's nothing to bundle.
   if (quoteMint.equals(QUOTE_MINT)) {
-    const client = getDbcClient(connection);
     const tx = await client.pool.swap({
       owner: wallet.publicKey,
       pool: poolAddress,
@@ -999,80 +1000,110 @@ export async function buyWithSol(
     return finalizeAndSend(connection, wallet, tx);
   }
 
-  // Real bundled path: SOL -> quote asset (Jupiter) -> coin (DBC), one transaction.
-  const quoteRes = await fetch(
-    `https://lite-api.jup.ag/swap/v1/quote?inputMint=${QUOTE_MINT.toBase58()}&outputMint=${quoteMint.toBase58()}&amount=${solAmountLamports.toString()}&slippageBps=${slippageBps}`
-  );
-  if (!quoteRes.ok) throw new Error("Failed to get Jupiter quote");
-  const jupQuote = await quoteRes.json();
-
-  const ixRes = await fetch("https://lite-api.jup.ag/swap/v1/swap-instructions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ quoteResponse: jupQuote, userPublicKey: wallet.publicKey.toBase58() }),
-  });
-  if (!ixRes.ok) throw new Error("Failed to get Jupiter swap instructions");
-  const ixData = await ixRes.json();
-
-  function deserializeIx(ix: any): TransactionInstruction {
-    return new TransactionInstruction({
+  const jfetch = async (url: string, init?: RequestInit) => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 8000);
+    try {
+      return await fetch(url, { ...init, signal: ctl.signal });
+    } finally {
+      clearTimeout(t);
+    }
+  };
+  const de = (ix: any) =>
+    new TransactionInstruction({
       programId: new PublicKey(ix.programId),
-      keys: ix.accounts.map((a: any) => ({
-        pubkey: new PublicKey(a.pubkey),
-        isSigner: a.isSigner,
-        isWritable: a.isWritable,
-      })),
+      keys: ix.accounts.map((a: any) => ({ pubkey: new PublicKey(a.pubkey), isSigner: a.isSigner, isWritable: a.isWritable })),
       data: Buffer.from(ix.data, "base64"),
     });
+
+  // One Jupiter route (SOL -> quote token) plus the curve buy that spends its GUARANTEED minimum output
+  const prepare = async (maxAccounts: number | null) => {
+    const url =
+      `https://lite-api.jup.ag/swap/v1/quote?inputMint=${QUOTE_MINT.toBase58()}&outputMint=${quoteMint.toBase58()}` +
+      `&amount=${solAmountLamports.toString()}&slippageBps=${slippageBps}` +
+      (maxAccounts ? `&maxAccounts=${maxAccounts}` : "");
+    const qr = await jfetch(url);
+    if (!qr.ok) return null;
+    const jupQuote = await qr.json();
+    if (!jupQuote?.otherAmountThreshold) return null;
+    const ir = await jfetch("https://lite-api.jup.ag/swap/v1/swap-instructions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quoteResponse: jupQuote, userPublicKey: wallet.publicKey.toBase58() }),
+    });
+    if (!ir.ok) return null;
+    const ixData = await ir.json();
+    if (!ixData?.swapInstruction) return null;
+    const jupIxs: TransactionInstruction[] = [
+      ...(ixData.setupInstructions || []).map(de),
+      de(ixData.swapInstruction),
+      ...(ixData.cleanupInstruction ? [de(ixData.cleanupInstruction)] : []),
+    ];
+    const alts: AddressLookupTableAccount[] = [];
+    for (const addr of ixData.addressLookupTableAddresses || []) {
+      const r = await connection.getAddressLookupTable(new PublicKey(addr));
+      if (r.value) alts.push(r.value);
+    }
+    const guaranteed = BigInt(jupQuote.otherAmountThreshold);
+    const dbcQuote = await quotePartialFillTrade(connection, poolAddress, guaranteed, slippageBps);
+    const dbcTx = await client.pool.swap2({
+      owner: wallet.publicKey,
+      pool: poolAddress,
+      swapBaseForQuote: false,
+      swapMode: SwapMode.PartialFill,
+      amountIn: new BN(guaranteed.toString()),
+      minimumAmountOut: new BN(dbcQuote.minimumAmountOut.toString()),
+      referralTokenAccount: null,
+    });
+    return { jupIxs, alts, curveIxs: dbcTx.instructions };
+  };
+
+  const compile = async (ixs: TransactionInstruction[], alts: AddressLookupTableAccount[]) => {
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    const vt = new VersionedTransaction(
+      new TransactionMessage({ payerKey: wallet.publicKey, recentBlockhash: blockhash, instructions: ixs }).compileToV0Message(alts)
+    );
+    return { vt, blockhash, lastValidBlockHeight };
+  };
+  const sendSigned = async (vt: VersionedTransaction, blockhash: string, lastValidBlockHeight: number) => {
+    const signed = await wallet.signTransaction(vt as any);
+    const signature = await connection.sendRawTransaction((signed as any).serialize());
+    await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+    return signature;
+  };
+
+  // Try for one transaction: ask Jupiter for simpler and simpler routes until the bundle fits
+  let first: Awaited<ReturnType<typeof prepare>> = null;
+  for (const maxAccounts of [null, 40, 32, 26]) {
+    const prep = await prepare(maxAccounts);
+    if (!prep) {
+      if (!first) throw new Error("Failed to get Jupiter quote");
+      continue;
+    }
+    if (!first) first = prep;
+    const c = await compile([...prep.jupIxs, ...prep.curveIxs], prep.alts);
+    let size = Infinity;
+    try {
+      size = c.vt.serialize().length;
+    } catch {
+      size = Infinity;
+    }
+    if (size <= 1232) return sendSigned(c.vt, c.blockhash, c.lastValidBlockHeight);
   }
 
-  const jupiterInstructions: TransactionInstruction[] = [
-    ...(ixData.setupInstructions || []).map(deserializeIx),
-    deserializeIx(ixData.swapInstruction),
-    ...(ixData.cleanupInstruction ? [deserializeIx(ixData.cleanupInstruction)] : []),
-  ];
-
-  const altAccounts: AddressLookupTableAccount[] = [];
-  for (const addr of ixData.addressLookupTableAddresses || []) {
-    const res = await connection.getAddressLookupTable(new PublicKey(addr));
-    if (res.value) altAccounts.push(res.value);
+  // Still too big for one transaction: swap first, then buy the coin (two approvals)
+  if (!first) throw new Error("Failed to get Jupiter quote");
+  const a = await compile(first.jupIxs, first.alts);
+  await sendSigned(a.vt, a.blockhash, a.lastValidBlockHeight);
+  try {
+    const b = await compile(first.curveIxs, []);
+    return await sendSigned(b.vt, b.blockhash, b.lastValidBlockHeight);
+  } catch (err: any) {
+    throw new Error(
+      "Your SOL was swapped into the stock token, but the coin purchase did not complete. The funds are safe in your wallet; you can swap them back on Jupiter. " +
+        (err?.message ?? "")
+    );
   }
-
-  // The DBC leg: buy the coin using however much of the quote asset Jupiter
-  // will actually output. Partial-fill means we can safely send a bit more
-  // than the exact expected amount as a buffer — it never overspends past
-  // what the curve can take.
-  // Spend Jupiter's GUARANTEED minimum output (after slippage), never the optimistic quote:
-  // the swap can land slightly below the quote, and the curve leg must never ask for more than arrived.
-  // Any small extra the swap delivers stays in the buyer's wallet as quote-token dust.
-  const guaranteedQuoteOut = BigInt(jupQuote.otherAmountThreshold);
-  // Slippage protection on the curve leg too (no more minimumAmountOut = 0)
-  const dbcQuote = await quotePartialFillTrade(connection, poolAddress, guaranteedQuoteOut, slippageBps);
-  const client = getDbcClient(connection);
-  const dbcTx = await client.pool.swap2({
-    owner: wallet.publicKey,
-    pool: poolAddress,
-    swapBaseForQuote: false,
-    swapMode: SwapMode.PartialFill,
-    amountIn: new BN(guaranteedQuoteOut.toString()),
-    minimumAmountOut: new BN(dbcQuote.minimumAmountOut.toString()),
-    referralTokenAccount: null,
-  });
-
-  const allInstructions = [...jupiterInstructions, ...dbcTx.instructions];
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-
-  const message = new TransactionMessage({
-    payerKey: wallet.publicKey,
-    recentBlockhash: blockhash,
-    instructions: allInstructions,
-  }).compileToV0Message(altAccounts);
-
-  const versionedTx = new VersionedTransaction(message);
-  const signed = await wallet.signTransaction(versionedTx as any);
-  const signature = await connection.sendRawTransaction((signed as any).serialize());
-  await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
-  return signature;
 }
 
 /** A quote mint's real decimals, read on-chain — never assumed to be SOL's 9. */
