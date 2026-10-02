@@ -1,74 +1,55 @@
-# Launchpad Web — Real Wallet + Program Frontend
+# Minti Q
 
-A Vite/React app wired to actually call the deployed `launchpad` Anchor
-program: connect Phantom or Solflare, create a coin, buy/sell on the live
-bonding curve. This is the real thing, not a simulation — every action here
-sends a signed transaction to whatever cluster `VITE_RPC_ENDPOINT` points at.
+A Solana token launchpad built on Meteora's Dynamic Bonding Curve (DBC). Live on mainnet at https://mintiq.fun (API: https://api.mintiq.fun).
 
-## Before you run this
+## What it does
 
-You need the program from `launchpad-program.zip` **built and deployed
-first** — this frontend has nothing to talk to otherwise.
+- **Free token launches** on a bonding curve that graduates to a Meteora DAMM v2 pool with liquidity permanently locked (70% platform, 30% creator).
+- **Creator royalties forever**: about 1% of every trade goes to the creator, before and after graduation.
+- **Stock-paired launches**: coins priced in tokenized stocks (SPCXx, QQQx from xStocks). Users only pay and receive SOL: a Jupiter swap is bundled with the curve trade in one transaction, and creator and platform fee claims are converted to SOL.
+- **Official token $MQ** with a buyback-and-burn bot.
+- **Launch signer**: every launch carries a common launchpad signer (E82kq7L8gy2jHniKNvNEBDQ81xicoKZpXdw6TrtDRwBx) so trading terminals can recognise Minti Q launches.
 
-```bash
-cd launchpad          # the program directory, not this one
-anchor build
-anchor deploy --provider.cluster devnet
-```
+## How it uses Meteora
 
-That gives you a program ID and, importantly, a real generated IDL at
-`target/idl/launchpad.json`.
+| Meteora feature | How Minti Q uses it |
+|---|---|
+| DBC config keys | One config per pairing: SOL, $MQ, SPCXx, QQQx. Fees are collected in the quote token. |
+| Token-2022 quote tokens with token badges | xStocks have extra extensions, so config creation and pool creation must pass the quote mint's badge. We patched the studio (scripts/studio-token-badge.patch) and the launch code to do this. |
+| DAMM v2 migration | Graduated pools migrate with 100% locked LP. Admin page can migrate by hand as a backup. |
+| Partner metadata | On-chain launchpad profile (name, website, logo) at 7admKcevRmrTUJjpXYLkevits7ueYHojfGfjrwPtr3Dr. |
+| Fee claiming | Creator and platform claims from the curve and from DAMM v2. |
 
-## Setup
+## Mainnet addresses
 
-```bash
-npm install
-cp .env.example .env
-```
+- DBC program: dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN
+- Platform wallet (fee claimer): HVJweDmPS5jgrb49fL4Q7U3wRAJfZcs3AL7cBW3nVdX5
+- Platform config (SOL, graduates at 85 SOL): GJk2WSDpRmmHAdBpSHnEcWH4o3LRrgZCKKEKtJ1MN7zr
+- $MQ config: GY1GJSegjs1b4SKAx8w8ZkijjgUHXKti2HW7MxBaGUp1
+- SPCXx config (graduates at 68 SPCXx, about 85 SOL): CPezBxqjHb285tMynvizRnjCZ5cbdZN6Bc5rnhPZX5bN
+- QQQx config (graduates at 13.5 QQQx, about 85 SOL): GytJnjPzDeYgQQ3SEJsVFS6C46K7iV8M8fTXbrksiSoi
+- Config creation transactions: SPCXx jupE6ZKJknA98pH8pJ2C1xt3oybkkNt5bkpSERgj25NHhMUAgDSN8hqmqAGa6Aisoq18KgJcf2FNZUXQbXFZedL, QQQx nFBLd8cEtsfverhG7gZZ1dG9TDCmximMUREfUYbUkoxWp2nMNGQxgVKjA3r5LuYGu9CNcxLUfP8vRt3R7ApnjPH
+- Partner profile transaction: 44qvGKGtar4tSxNtE1gZQW3YccWWtWUpxsZ5PsiRAbUVwsdNgRe4V5XkbenYzXqUgBjtLZkwGzfBpPGigwCAQ7d7
 
-Edit `.env`:
-- `VITE_PROGRAM_ID` — the program ID from `anchor deploy`
-- `VITE_PLATFORM_FEE_VAULT` — your treasury address (same one you put in
-  `platform_fee_vault::ID` in the Rust program)
-- `VITE_RPC_ENDPOINT` — devnet by default, swap for mainnet when ready
+## What we verified on mainnet
 
-**Replace `src/idl/launchpad.json` with the real one.** The IDL in this repo
-is hand-written to match `lib.rs` account-for-account so the client code
-compiles and reads correctly, but the instruction and account
-**discriminators are placeholder zeros** — I can't compute Anchor's real
-sha256-based discriminators without actually running `anchor build` against
-your compiled program. Copy `launchpad/target/idl/launchpad.json` over
-`src/idl/launchpad.json` after you build. Skipping this step means every
-transaction will fail at the RPC with a discriminator mismatch — it's not
-optional.
+- **Full lifecycle on a 0.03 SOL test config**: launch, trading, curve completion, migration to DAMM v2 (pool 4t5o6hDAPBBDvsNxMmKPVUMsodPT8F3pNsZCreZazwhY, coin MQKudm2Hh2VhSC28vxUnG6pkQ7QeiJWy15FdXvEChDu), LP 100% locked, post-graduation sell, creator and platform fee claims. The production configs differ only in the graduation threshold.
+- **Stock-paired coin**: MARSCOIN (MQoynJQE19kRM1TswCsKTW4rp5ueSNKCe7eZjwaqoo2) on the SPCXx config. Buy with SOL (one transaction: SOL to USDC to SPCXx to coin) and sell back to SOL both work.
 
-```bash
-npm run dev
-```
+Not yet tested: graduation of a stock-paired coin, and a production-size (85 SOL) graduation handled by Meteora's keepers.
 
-## What's actually wired up
+## Repository layout
 
-- **Wallet connect** — Phantom + Solflare via `@solana/wallet-adapter-react`.
-- **Create coin** — generates a fresh mint keypair client-side, derives the
-  bonding curve PDA and vault, sends `create_coin`. Requires two signatures:
-  your wallet and the freshly generated mint (handled automatically).
-- **Buy / sell** — quotes computed client-side in `src/lib/curve.ts` (mirrors
-  the on-chain formula exactly) to show price and set `min_tokens_out` /
-  `min_sol_out` with a 1% slippage tolerance, then sends the real instruction.
-- **Coin list** — `program.account.bondingCurve.all()`, i.e. `getProgramAccounts`
-  filtered by the account's discriminator. Works today; at real scale
-  (thousands of coins) you'd want an indexer instead of scanning all
-  program accounts on every page load.
+- `src/`: React and Vite frontend (launch form, token pages, admin tools)
+- `scripts/meteora-configs/`: the config recipes used to create the mainnet configs
+- `scripts/add-xstock.sh`: adds a new stock pairing (dry run, create, verify on chain, add to the site)
+- `scripts/studio-token-badge.patch`: passes the token badge when creating configs
+- Backend (API, trade indexer, buyback bot, launch signer): separate repo, mintiq-backend
 
-## Known gaps
+## Run locally
 
-- **No metadata/image display.** The program doesn't CPI into Metaplex yet
-  (see the program README), so there's no image to show even though the
-  create form takes a `uri` field. Fine for devnet testing, not for a real
-  launch.
-- **No transaction confirmation UI beyond a toast.** Real trading volume
-  will want retry logic, priority fees, and a proper pending/confirmed/failed
-  state per transaction.
-- **No migration UI.** `mark_migrated` isn't called from the frontend at all
-  yet — the program instruction exists but nothing in the UI triggers it,
-  since the actual LP-creation CPI it depends on isn't built either.
+    npm install
+    cp .env.example .env.mainnet   # fill in the values
+    npm run dev -- --mode mainnet
+
+Build for mainnet with `npm run build -- --mode mainnet`.
