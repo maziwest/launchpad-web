@@ -286,7 +286,7 @@ export default function CreateCoinPage({
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
             />
-            <div className="form-hint" style={{ marginBottom: 16 }}>Leave blank to link to Minti Q.</div>
+            <div className="form-hint" style={{ marginBottom: 16 }}>Optional. Add a link only if you want one.</div>
             <div className="field-row-2">
               <div>
                 <label className="form-label">X / Twitter</label>
