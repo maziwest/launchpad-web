@@ -241,9 +241,10 @@ export default function App() {
             setTokenSocials((prev) => {
               const next = new Map(prev);
               next.set(c.mint.toBase58(), {
-                twitter: meta.twitter || undefined,
-                telegram: meta.telegram || undefined,
-                website: meta.website || undefined,
+                // only plain http(s) links from metadata: blocks javascript: and data: URLs
+                twitter: /^https?:\/\//i.test(String(meta.twitter ?? "").trim()) ? String(meta.twitter).trim() : undefined,
+                telegram: /^https?:\/\//i.test(String(meta.telegram ?? "").trim()) ? String(meta.telegram).trim() : undefined,
+                website: /^https?:\/\//i.test(String(meta.website ?? "").trim()) ? String(meta.website).trim() : undefined,
               });
               return next;
             });
