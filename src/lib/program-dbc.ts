@@ -264,7 +264,7 @@ export async function createCoin(
     ...(hasBadge ? { tokenBadge: badge } : {}),
   } as any);
 
-  const sig = await finalizeAndSend(connection, wallet, tx, [mint]);
+  const sig = await sendLaunchWithSigner(connection, wallet, tx, mint);
 
   return { mint: mint.publicKey, signature: sig };
 }
@@ -1368,4 +1368,73 @@ async function sendClaimAsSol(
   if (fits) return sendV0(all);
   await finalizeAndSend(connection, wallet, claimTx);
   return sendV0(jupIxs);
+}
+
+
+/**
+ * Minti Q common signer. Every launch carries a memo that lists the launchpad's public key as a read-only signer,
+ * and the backend adds that signature last, so trading terminals can recognise Minti Q launches.
+ * If the signer service is unreachable (or the memo makes the transaction too big), the launch is built without it.
+ */
+const LAUNCHPAD_API = "https://api.mintiq.fun";
+const MEMO_PROGRAM_ID = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
+
+async function launchpadFetch(path: string, init?: RequestInit): Promise<any | null> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 4000);
+  try {
+    const r = await fetch(`${LAUNCHPAD_API}${path}`, { ...init, signal: ctl.signal });
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function sendLaunchWithSigner(
+  connection: Connection,
+  wallet: AnchorProvider["wallet"],
+  tx: import("@solana/web3.js").Transaction,
+  mint: Keypair
+): Promise<string> {
+  const stripMemo = () => {
+    tx.instructions = tx.instructions.filter((ix) => !ix.programId.equals(MEMO_PROGRAM_ID));
+  };
+  const info = await launchpadFetch("/launch/signer");
+  if (!info?.pubkey) return finalizeAndSend(connection, wallet, tx, [mint]);
+
+  tx.add(
+    new TransactionInstruction({
+      programId: MEMO_PROGRAM_ID,
+      keys: [{ pubkey: new PublicKey(info.pubkey), isSigner: true, isWritable: false }],
+      data: Buffer.from("mintiq.fun"),
+    })
+  );
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = wallet.publicKey;
+  tx.partialSign(mint);
+  try {
+    tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+  } catch {
+    stripMemo(); // too big with the memo: launch without it
+    return finalizeAndSend(connection, wallet, tx, [mint]);
+  }
+
+  const signed = await wallet.signTransaction(tx);
+  const reply = await launchpadFetch("/launch/sign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      transaction: Buffer.from(signed.serialize({ requireAllSignatures: false, verifySignatures: false })).toString("base64"),
+    }),
+  });
+  if (!reply?.transaction) {
+    stripMemo(); // signer service failed after the wallet signed: rebuild without the memo (wallet asks once more)
+    return finalizeAndSend(connection, wallet, tx, [mint]);
+  }
+  const signature = await connection.sendRawTransaction(Buffer.from(reply.transaction, "base64"));
+  await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
+  return signature;
 }
