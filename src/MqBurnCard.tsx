@@ -54,7 +54,7 @@ export default function MqBurnCard({ priceUsd, onViewAll }: { priceUsd: number |
       </div>
 
       <p style={{ margin: 0, color: muted, fontSize: 14, lineHeight: 1.6 }}>
-        The platform spends $MQ trading fees buying $MQ on the open market and burning it. Supply goes down and never comes back.
+        The platform spends $MQ trading fees buying $MQ on the open market and burning it. Supply goes down and never comes back. Buyback and burn starts once $MQ graduates.
       </p>
 
       <div style={divider} />
