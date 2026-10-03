@@ -1,3 +1,4 @@
+import { QUOTE_TOKEN_OPTIONS } from "./lib/quote-tokens";
 import { ADMIN_WALLET, API_BASE_URL, EXPLORER_SUFFIX, IS_MAINNET } from "./lib/network";
 import { fetchVerifiedMintsFromApi, setCoinVerifiedApi } from "./lib/program-dbc";
 import React, { useCallback, useEffect, useState } from "react";
@@ -40,6 +41,37 @@ const FONT_BODY = "'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif";
 const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
 
 type Section = "overview" | "tokens" | "revenue" | "operations";
+
+const SOL_MINT_STR = "So11111111111111111111111111111111111111112";
+
+// SOL value of 1 whole token, per quote mint, from Jupiter (stock pairs are paid out in SOL)
+async function fetchQuoteSolPrices(mints: string[]): Promise<Record<string, number>> {
+  const ids = Array.from(new Set([SOL_MINT_STR, ...mints.filter((x) => x !== SOL_MINT_STR)]));
+  const out: Record<string, number> = {};
+  try {
+    const r = await fetch(`https://lite-api.jup.ag/price/v3?ids=${ids.join(",")}`);
+    if (!r.ok) return out;
+    const d = await r.json();
+    const sol = Number(d?.[SOL_MINT_STR]?.usdPrice);
+    if (!(sol > 0)) return out;
+    for (const id of ids) {
+      const usd = Number(d?.[id]?.usdPrice);
+      if (id !== SOL_MINT_STR && usd > 0) out[id] = usd / sol;
+    }
+  } catch {
+    /* prices unavailable: stock piles show 0 until they load */
+  }
+  return out;
+}
+
+// Raw on-chain quote amount -> SOL value, using the coin's own quote decimals
+function rawToSol(raw: bigint | number, coin: { quoteMint: PublicKey; quoteDecimals: number }, prices: Record<string, number>): number {
+  const tokens = Number(raw) / 10 ** coin.quoteDecimals;
+  const mint = coin.quoteMint.toBase58();
+  if (mint === SOL_MINT_STR) return tokens;
+  const price = prices[mint];
+  return price ? tokens * price : 0;
+}
 
 interface ScanResult {
   coin: OnChainCoin;
@@ -225,6 +257,7 @@ export default function AdminDashboardPage() {
       const allCoins = await fetchAllCoins(connection);
       const client = getDbcClient(connection);
       const results: ScanResult[] = [];
+      const prices = await fetchQuoteSolPrices(allCoins.map((x) => x.quoteMint.toBase58()));
 
       for (const coin of allCoins) {
         if (coin.migrated) {
@@ -233,7 +266,7 @@ export default function AdminDashboardPage() {
           if (!pool) continue;
           const positionInfo = await fetchDammPosition(connection, pool.poolAddress, wallet.publicKey);
           if (positionInfo && positionInfo.unclaimedFeeBLamports > 0n) {
-            results.push({ coin, kind: "DAMM v2", unclaimedSol: Number(positionInfo.unclaimedFeeBLamports) / LAMPORTS_PER_SOL });
+            results.push({ coin, kind: "DAMM v2", unclaimedSol: rawToSol(positionInfo.unclaimedFeeBLamports, coin, prices) });
           }
         } else {
           if (!wallet.publicKey) continue;
@@ -244,7 +277,7 @@ export default function AdminDashboardPage() {
           if (quoteFee.isZero()) continue;
           const poolConfig = await client.state.getPoolConfig(p.config);
           if (!poolConfig || !(poolConfig as any).feeClaimer.equals(wallet.publicKey)) continue;
-          results.push({ coin, kind: "DBC", unclaimedSol: Number(quoteFee.toString()) / LAMPORTS_PER_SOL });
+          results.push({ coin, kind: "DBC", unclaimedSol: rawToSol(BigInt(quoteFee.toString()), coin, prices) });
         }
       }
       setScanResults(results.sort((a, b) => b.unclaimedSol - a.unclaimedSol));
@@ -381,6 +414,10 @@ export default function AdminDashboardPage() {
 
   const [coins, setCoins] = useState<OnChainCoin[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [quotePrices, setQuotePrices] = useState<Record<string, number>>({});
+  useEffect(() => {
+    fetchQuoteSolPrices(QUOTE_TOKEN_OPTIONS.map((q) => q.mint.toBase58())).then(setQuotePrices);
+  }, []);
   const [loadingCoins, setLoadingCoins] = useState(true);
   const [loadingStats, setLoadingStats] = useState(false);
   const [verified, setVerified] = useState<Set<string>>(new Set());
@@ -446,12 +483,9 @@ export default function AdminDashboardPage() {
     return c.name.toLowerCase().includes(q) || c.symbol.toLowerCase().includes(q) || c.mint.toBase58().toLowerCase().includes(q);
   });
 
-  const totalUnclaimedSol =
-    coins.length > 0
-      ? Number(coins.reduce((s, c) => s + c.creatorUnclaimedFeeLamports + c.partnerUnclaimedFeeLamports, 0n)) / LAMPORTS_PER_SOL
-      : 0;
-  const totalCreatorUnclaimedSol = coins.length > 0 ? Number(coins.reduce((s, c) => s + c.creatorUnclaimedFeeLamports, 0n)) / LAMPORTS_PER_SOL : 0;
-  const totalPartnerUnclaimedSol = coins.length > 0 ? Number(coins.reduce((s, c) => s + c.partnerUnclaimedFeeLamports, 0n)) / LAMPORTS_PER_SOL : 0;
+  const totalUnclaimedSol = coins.reduce((s, c) => s + rawToSol(c.creatorUnclaimedFeeLamports + c.partnerUnclaimedFeeLamports, c, quotePrices), 0);
+  const totalCreatorUnclaimedSol = coins.reduce((s, c) => s + rawToSol(c.creatorUnclaimedFeeLamports, c, quotePrices), 0);
+  const totalPartnerUnclaimedSol = coins.reduce((s, c) => s + rawToSol(c.partnerUnclaimedFeeLamports, c, quotePrices), 0);
   const migratedCount = coins.filter((c) => c.migrated).length;
 
   const pillIcon = (
@@ -499,7 +533,7 @@ export default function AdminDashboardPage() {
       filteredCoins.map((c) => {
         const mintStr = c.mint.toBase58();
         const isVerified = verified.has(mintStr);
-        const unclaimed = Number(c.creatorUnclaimedFeeLamports + c.partnerUnclaimedFeeLamports) / LAMPORTS_PER_SOL;
+        const unclaimed = rawToSol(c.creatorUnclaimedFeeLamports + c.partnerUnclaimedFeeLamports, c, quotePrices);
         return (
           <div key={mintStr} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 0.7fr", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "1px solid #222425", fontSize: 13 }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
@@ -723,7 +757,7 @@ export default function AdminDashboardPage() {
                   coins.slice(0, 6).map((c) => {
                     const mintStr = c.mint.toBase58();
                     const isVerified = verified.has(mintStr);
-                    const unclaimed = Number(c.creatorUnclaimedFeeLamports + c.partnerUnclaimedFeeLamports) / LAMPORTS_PER_SOL;
+                    const unclaimed = rawToSol(c.creatorUnclaimedFeeLamports + c.partnerUnclaimedFeeLamports, c, quotePrices);
                     return (
                       <div key={mintStr} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 0.7fr", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "1px solid #222425", fontSize: 13 }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
@@ -801,8 +835,8 @@ export default function AdminDashboardPage() {
                     .map((c) => (
                       <div key={c.mint.toBase58()} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr", gap: 12, alignItems: "center", padding: "12px 0", borderBottom: "1px solid #222425", fontSize: 13 }}>
                         <span style={{ fontWeight: 600 }}>${c.symbol}</span>
-                        <span style={{ fontFamily: FONT_MONO }}>{(Number(c.creatorUnclaimedFeeLamports) / LAMPORTS_PER_SOL).toFixed(4)} SOL</span>
-                        <span style={{ fontFamily: FONT_MONO }}>{(Number(c.partnerUnclaimedFeeLamports) / LAMPORTS_PER_SOL).toFixed(4)} SOL</span>
+                        <span style={{ fontFamily: FONT_MONO }}>{rawToSol(c.creatorUnclaimedFeeLamports, c, quotePrices).toFixed(4)} SOL</span>
+                        <span style={{ fontFamily: FONT_MONO }}>{rawToSol(c.partnerUnclaimedFeeLamports, c, quotePrices).toFixed(4)} SOL</span>
                       </div>
                     ))
                 )}
