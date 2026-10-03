@@ -148,24 +148,26 @@ export default function App() {
   // immediately — main.tsx already routes /admin and /admin/dashboard to
   // different components entirely, so any other non-root path here is
   // always a potential mint address, never one of those reserved routes.
-  const initialPathMint = (() => {
-    const path = window.location.pathname.slice(1); // drop leading "/"
-    return path.length > 0 ? path : null;
-  })();
-  const [selectedMint, setSelectedMint] = useState<string | null>(initialPathMint);
-  const [view, setView] = useState<"discover" | "trade" | "create" | "burn">(initialPathMint ? "trade" : "discover");
+  // Reserved paths: /burn opens Burn, /mq opens the official $MQ token; any other non-root path is a coin mint
+  const routeFromPath = (raw: string): { mint: string | null; view: "discover" | "trade" | "create" | "burn" } => {
+    const path = raw.replace(/^\/+|\/+$/g, "");
+    if (!path) return { mint: null, view: "discover" };
+    const lower = path.toLowerCase();
+    if (lower === "burn") return { mint: null, view: "burn" };
+    if (lower === "mq" && MQ_MINT) return { mint: MQ_MINT, view: "trade" };
+    return { mint: path, view: "trade" };
+  };
+  const initialRoute = routeFromPath(window.location.pathname);
+  const initialPathMint = initialRoute.mint;
+  const [selectedMint, setSelectedMint] = useState<string | null>(initialRoute.mint);
+  const [view, setView] = useState<"discover" | "trade" | "create" | "burn">(initialRoute.view);
 
   // Browser back/forward should navigate too, not just our own buttons.
   useEffect(() => {
     function handlePopState() {
-      const path = window.location.pathname.slice(1);
-      if (path.length > 0) {
-        setSelectedMint(path);
-        setView("trade");
-      } else {
-        setSelectedMint(null);
-        setView("discover");
-      }
+      const r = routeFromPath(window.location.pathname);
+      setSelectedMint(r.mint);
+      setView(r.view);
     }
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -765,8 +767,16 @@ export default function App() {
     setSelectedMint(mint);
     setView("trade");
     setAmount("");
-    if (window.location.pathname !== `/${mint}`) {
-      window.history.pushState({}, "", `/${mint}`);
+    const target = MQ_MINT && mint === MQ_MINT ? "/mq" : `/${mint}`;
+    if (window.location.pathname !== target) {
+      window.history.pushState({}, "", target);
+    }
+  }
+
+  function goToBurn() {
+    setView("burn");
+    if (window.location.pathname !== "/burn") {
+      window.history.pushState({}, "", "/burn");
     }
   }
 
@@ -997,8 +1007,8 @@ export default function App() {
             <span>Minti <span style={{ color: "var(--mint)" }}>Q</span></span>
           </div>
           <nav className="nav-links">
-            <a onClick={() => goToSection("tokens")} style={{ cursor: "pointer" }}>$MQ</a>
-            <a style={{ cursor: "pointer" }} onClick={() => setView("burn")}>Burn</a>
+            <a onClick={() => (MQ_MINT ? openCoin(MQ_MINT) : goToSection("tokens"))} style={{ cursor: "pointer" }}>$MQ</a>
+            <a style={{ cursor: "pointer" }} onClick={() => goToBurn()}>Burn</a>
             <a>Royalties</a>
             <a>Revenue</a>
             <a>Documentation</a>
@@ -1052,8 +1062,8 @@ export default function App() {
         {mobileMenuOpen && (
           <div className="mobile-menu open">
             <nav className="mobile-menu-links">
-              <a onClick={() => { goToSection("tokens"); setMobileMenuOpen(false); }} style={{ cursor: "pointer" }}>$MQ</a>
-              <a style={{ cursor: "pointer" }} onClick={() => { setView("burn"); setMobileMenuOpen(false); }}>Burn</a>
+              <a onClick={() => { if (MQ_MINT) openCoin(MQ_MINT); else goToSection("tokens"); setMobileMenuOpen(false); }} style={{ cursor: "pointer" }}>$MQ</a>
+              <a style={{ cursor: "pointer" }} onClick={() => { goToBurn(); setMobileMenuOpen(false); }}>Burn</a>
               <a>Royalties</a>
               <a>Revenue</a>
               <a>Documentation</a>
@@ -1770,7 +1780,7 @@ export default function App() {
       {selected.mint.toBase58() === MQ_MINT && (
         <MqBurnCard
           priceUsd={usdPriceFor(selected) != null ? selected.priceInSol * usdPriceFor(selected)! : null}
-          onViewAll={() => setView("burn")}
+          onViewAll={() => goToBurn()}
         />
       )}
       <div
