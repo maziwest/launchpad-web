@@ -161,7 +161,11 @@ export interface OnChainCoin {
 /** All coins launched under our config key, with real Metaplex name/symbol attached. */
 export async function fetchAllCoins(connection: Connection): Promise<OnChainCoin[]> {
   const client = getDbcClient(connection);
-  const pools = (await Promise.all(DISPLAY_CONFIG_KEYS.map((k) => client.state.getPoolsByConfig(k)))).flat();
+  // Every config the site supports: the display configs plus each quote-token config (stock pairs live there)
+  const { QUOTE_TOKEN_OPTIONS } = await import("./quote-tokens");
+  const configKeys = new Map<string, PublicKey>();
+  for (const k of [...DISPLAY_CONFIG_KEYS, ...QUOTE_TOKEN_OPTIONS.map((q) => q.configKey)]) configKeys.set(k.toBase58(), k);
+  const pools = (await Promise.all([...configKeys.values()].map((k) => client.state.getPoolsByConfig(k)))).flat();
 
   return Promise.all(
     pools.map(async ({ publicKey, account }) => {
