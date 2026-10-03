@@ -7,14 +7,14 @@ A Solana token launchpad built on Meteora's Dynamic Bonding Curve (DBC). Live on
 - **No launch fee** (creators pay only on-chain costs of about 0.02 SOL (account rent plus Metaplex's 0.01 SOL token-metadata fee) and a small image upload fee): tokens launch on a bonding curve that graduates to a Meteora DAMM v2 pool with liquidity permanently locked (70% platform, 30% creator).
 - **Creator royalties forever**: about 1% of every trade goes to the creator, before and after graduation.
 - **Stock-paired launches**: coins priced in tokenized stocks (SPCXx, QQQx from xStocks). Users only pay and receive SOL: a Jupiter swap is bundled with the curve trade in one transaction, and creator and platform fee claims are converted to SOL.
-- **Official token $MQ** with a buyback-and-burn bot (built and tested on devnet; mainnet launch pending).
+- **Official token $MQ** live on mainnet and paired with Alphabet's xStock (GOOGLx). A buyback-and-burn bot (built and tested on devnet) starts once $MQ graduates.
 - **Launch signer**: every launch carries a common launchpad signer (E82kq7L8gy2jHniKNvNEBDQ81xicoKZpXdw6TrtDRwBx) so trading terminals can recognise Minti Q launches. It applies to new launches only; the first live launch with it is pending.
 
 ## How it uses Meteora
 
 | Meteora feature | How Minti Q uses it |
 |---|---|
-| DBC config keys | One config per pairing: SOL, $MQ, SPCXx, QQQx. Fees are collected in the quote token. |
+| DBC config keys | One config per pairing (SOL, SPCXx, QQQx, GOOGLx, DKNG) plus the official $MQ config. Fees are collected in the quote token. |
 | Token-2022 quote tokens with token badges | xStocks have extra extensions, so config creation and pool creation must pass the quote mint's badge. We patched the studio (scripts/studio-token-badge.patch) and the launch code to do this. |
 | DAMM v2 migration | Graduated pools migrate with 100% locked LP. Admin page can migrate by hand as a backup. |
 | Partner metadata | On-chain launchpad profile (name, website, logo) at 7admKcevRmrTUJjpXYLkevits7ueYHojfGfjrwPtr3Dr. |
@@ -25,7 +25,7 @@ A Solana token launchpad built on Meteora's Dynamic Bonding Curve (DBC). Live on
 - DBC program: dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN
 - Platform wallet (fee claimer): HVJweDmPS5jgrb49fL4Q7U3wRAJfZcs3AL7cBW3nVdX5
 - Platform config (SOL, graduates at 85 SOL): GJk2WSDpRmmHAdBpSHnEcWH4o3LRrgZCKKEKtJ1MN7zr
-- $MQ config: GY1GJSegjs1b4SKAx8w8ZkijjgUHXKti2HW7MxBaGUp1
+- $MQ (official token, GOOGLx-paired, 3% fee): mint MQhjUoyMXJY5k8h7u58APm6wa18aVg8oxkiNY3Y7zbW, config 57rfrgW5YqPZ4mh4wvsvvaCFSC1bqRZzmwWVHRH37FJP, pool CZBksYLStuuWba21pijtHMYTZ68mFdwtDin3HyKczxNJ
 - SPCXx config (graduates at 68 SPCXx, about 85 SOL): CPezBxqjHb285tMynvizRnjCZ5cbdZN6Bc5rnhPZX5bN
 - QQQx config (graduates at 13.5 QQQx, about 85 SOL): GytJnjPzDeYgQQ3SEJsVFS6C46K7iV8M8fTXbrksiSoi
 - Config creation transactions: SPCXx jupE6ZKJknA98pH8pJ2C1xt3oybkkNt5bkpSERgj25NHhMUAgDSN8hqmqAGa6Aisoq18KgJcf2FNZUXQbXFZedL, QQQx nFBLd8cEtsfverhG7gZZ1dG9TDCmximMUREfUYbUkoxWp2nMNGQxgVKjA3r5LuYGu9CNcxLUfP8vRt3R7ApnjPH
