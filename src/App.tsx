@@ -1,5 +1,5 @@
 import { sellToSol } from "./lib/program-dbc";
-import { MQ_MINT, EXPLORER_SUFFIX } from "./lib/network";
+import { MQ_MINT, EXPLORER_SUFFIX, API_BASE_URL } from "./lib/network";
 import MqBurnCard from "./MqBurnCard";
 import { buyWithSolDamm, sellToSolDamm } from "./lib/damm-sol";
 import BurnPage from "./BurnPage";
@@ -864,6 +864,13 @@ export default function App() {
       setCreateStatus("Launching coin...");
       const { mint, signature } = await createCoin(connection, walletFor(), data.name, data.ticker, metadataUri, data.quoteToken.configKey);
       fireToast(`${data.ticker} launched — ${signature.slice(0, 8)}...`, "launch");
+      // Ask the backend to pick the new coin up right away (the 1-minute cron is the fallback), then reload the grid data a few times
+      fetch(`${API_BASE_URL}/coins/refresh?mint=${mint.toBase58()}`, { method: "POST" }).catch(() => {});
+      for (const ms of [3000, 7000, 12000]) {
+        window.setTimeout(() => {
+          fetchAllCoinsFromApi().then(patchMigratedPrices).then(setCoins).catch(() => {});
+        }, ms);
+      }
       await refresh();
       openCoin(mint.toBase58());
     } catch (err: any) {
