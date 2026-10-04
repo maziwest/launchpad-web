@@ -458,6 +458,8 @@ export default function AdminDashboardPage() {
           if (sj.volume24hLamports != null) extraStats.volume24hLamports = BigInt(sj.volume24hLamports);
           if (sj.totalPartnerClaimedLamports != null) extraStats.totalPartnerClaimedLamports = BigInt(sj.totalPartnerClaimedLamports);
           if (sj.totalCreatorClaimedLamports != null) extraStats.totalCreatorClaimedLamports = BigInt(sj.totalCreatorClaimedLamports);
+          if (sj.totalPartnerClaimedLamports != null) extraStats.totalPartnerClaimedLamports = BigInt(sj.totalPartnerClaimedLamports);
+          if (sj.totalCreatorClaimedLamports != null) extraStats.totalCreatorClaimedLamports = BigInt(sj.totalCreatorClaimedLamports);
         }
       } catch {
         /* keep the scan's own numbers if the backend is unreachable */
