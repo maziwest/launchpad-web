@@ -25,7 +25,7 @@ A Solana token launchpad built on Meteora's Dynamic Bonding Curve (DBC). Live on
 - DBC program: dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN
 - Platform wallet (fee claimer): HVJweDmPS5jgrb49fL4Q7U3wRAJfZcs3AL7cBW3nVdX5
 - Platform config (SOL, graduates at 85 SOL): GJk2WSDpRmmHAdBpSHnEcWH4o3LRrgZCKKEKtJ1MN7zr
-- $MQ (official token, GOOGLx-paired, 3% fee): mint MQhjUoyMXJY5k8h7u58APm6wa18aVg8oxkiNY3Y7zbW, config 57rfrgW5YqPZ4mh4wvsvvaCFSC1bqRZzmwWVHRH37FJP, pool CZBksYLStuuWba21pijtHMYTZ68mFdwtDin3HyKczxNJ
+- $MQ (official token, GOOGLx-paired, 3% fee): mint MQYpYE28Qnzb89hxCj4LkMTDZDYP5GwnxJaEF9M8UyQ, config 49VK2rg5B8j6hF8CMVzt2Y8P5GyswvgDM7LXx2SVjZ2m, pool 965E6srvevPDYHrbuqLVVZ8sqG5mskAETxX6HK6p9V9K
 - SPCXx config (graduates at 68 SPCXx, about 85 SOL): CPezBxqjHb285tMynvizRnjCZ5cbdZN6Bc5rnhPZX5bN
 - QQQx config (graduates at 13.5 QQQx, about 85 SOL): GytJnjPzDeYgQQ3SEJsVFS6C46K7iV8M8fTXbrksiSoi
 - Config creation transactions: SPCXx jupE6ZKJknA98pH8pJ2C1xt3oybkkNt5bkpSERgj25NHhMUAgDSN8hqmqAGa6Aisoq18KgJcf2FNZUXQbXFZedL, QQQx nFBLd8cEtsfverhG7gZZ1dG9TDCmximMUREfUYbUkoxWp2nMNGQxgVKjA3r5LuYGu9CNcxLUfP8vRt3R7ApnjPH
