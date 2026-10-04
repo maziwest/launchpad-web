@@ -455,6 +455,13 @@ export default function App() {
 
   const liveCoins = [...coins]
     .sort((a, b) => Number(b.quoteReserveLamports) - Number(a.quoteReserveLamports))
+    // Official $MQ is pinned first when nobody is searching (the sort is stable, so everything else keeps its order)
+    .sort((a, b) => {
+      if (search.trim()) return 0;
+      const am = MQ_MINT && a.mint.toBase58() === MQ_MINT ? 1 : 0;
+      const bm = MQ_MINT && b.mint.toBase58() === MQ_MINT ? 1 : 0;
+      return bm - am;
+    })
     .slice(0, 3);
 
   const [freshSelectedCoin, setFreshSelectedCoin] = useState<OnChainCoin | null>(null);
