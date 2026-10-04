@@ -448,7 +448,19 @@ export default function AdminDashboardPage() {
     if (coins.length === 0) return;
     setLoadingStats(true);
     try {
-      setStats(await fetchDashboardStats(connection, coins));
+      const baseStats = await fetchDashboardStats(connection, coins);
+      const extraStats: any = {};
+      try {
+        const sr = await fetch(`${API_BASE_URL}/stats`);
+        if (sr.ok) {
+          const sj = await sr.json();
+          if (sj.totalVolumeLamports != null) extraStats.totalVolumeLamports = BigInt(sj.totalVolumeLamports);
+          if (sj.volume24hLamports != null) extraStats.volume24hLamports = BigInt(sj.volume24hLamports);
+        }
+      } catch {
+        /* keep the scan's own numbers if the backend is unreachable */
+      }
+      setStats({ ...baseStats, ...extraStats } as any);
     } catch (err) {
       console.error("Failed to compute dashboard stats:", err);
     } finally {
