@@ -1,6 +1,7 @@
 import { sellToSol } from "./lib/program-dbc";
 import { MQ_MINT, EXPLORER_SUFFIX } from "./lib/network";
 import MqBurnCard from "./MqBurnCard";
+import { buyWithSolDamm, sellToSolDamm } from "./lib/damm-sol";
 import BurnPage from "./BurnPage";
 import { PAIR_CATEGORIES } from "./lib/quote-tokens";
 import { fetchTradesFromApi, fetchClaimsFromApi } from "./lib/program-dbc";
@@ -607,10 +608,25 @@ export default function App() {
         if (coin.migrated) {
           const pool = await fetchDammPool(connection, coin.mint);
           if (!pool) throw new Error("DAMM v2 pool not found");
-          const inDec = tab === "buy" ? pool.quoteDecimals : pool.baseDecimals;
-          const outDec = tab === "buy" ? pool.baseDecimals : pool.quoteDecimals;
-          const q: any = await quoteDammTrade(connection, pool, BigInt(Math.floor(amt * 10 ** inDec)), tab === "sell", slip);
-          out = Number(q.outputAmount.toString()) / 10 ** outDec;
+          if (!coin.quoteMint.equals(QUOTE_MINT)) {
+            // stock pair after graduation: the user pays and receives SOL (Jupiter swap bundled with the pool swap)
+            if (tab === "buy") {
+              const jr = await fetch(`https://lite-api.jup.ag/swap/v1/quote?inputMint=${QUOTE_MINT.toBase58()}&outputMint=${coin.quoteMint.toBase58()}&amount=${Math.floor(amt * 1e9)}&slippageBps=${slip}`);
+              const jq = await jr.json();
+              const q: any = await quoteDammTrade(connection, pool, BigInt(jq.otherAmountThreshold), false, slip);
+              out = Number(q.outputAmount.toString()) / 10 ** pool.baseDecimals;
+            } else {
+              const q: any = await quoteDammTrade(connection, pool, BigInt(Math.floor(amt * 10 ** pool.baseDecimals)), true, slip);
+              const jr = await fetch(`https://lite-api.jup.ag/swap/v1/quote?inputMint=${coin.quoteMint.toBase58()}&outputMint=${QUOTE_MINT.toBase58()}&amount=${(q.minimumAmountOut ?? q.outputAmount).toString()}&slippageBps=${slip}`);
+              const jq = await jr.json();
+              out = Number(jq.outAmount) / 1e9;
+            }
+          } else {
+            const inDec = tab === "buy" ? pool.quoteDecimals : pool.baseDecimals;
+            const outDec = tab === "buy" ? pool.baseDecimals : pool.quoteDecimals;
+            const q: any = await quoteDammTrade(connection, pool, BigInt(Math.floor(amt * 10 ** inDec)), tab === "sell", slip);
+            out = Number(q.outputAmount.toString()) / 10 ** outDec;
+          }
         } else {
           const viaSol = !coin.quoteMint.equals(QUOTE_MINT); // stock pairs: user pays and receives SOL
           if (viaSol && tab === "buy") {
@@ -859,6 +875,13 @@ export default function App() {
         const pool = await fetchDammPool(connection, coin.mint);
         if (!pool) throw new Error("Migrated pool not found yet — try again in a moment");
         const lamports = BigInt(Math.floor(solAmount * LAMPORTS_PER_SOL));
+        if (!coin.quoteMint.equals(QUOTE_MINT)) {
+          // stock pair after graduation: pay SOL, swap it into the quote token on Jupiter, then into the coin
+          const sigSol = await buyWithSolDamm(connection, walletFor(), pool, lamports, Math.round(slippagePct * 100));
+          fireToast(`Bought — ${sigSol.slice(0, 8)}...`, "buy");
+          await refresh();
+          return;
+        }
         const quote = await quoteDammTrade(connection, pool, lamports, false, Math.round(slippagePct * 100));
         const sig = await dammBuy(connection, walletFor(), pool, lamports, BigInt((quote.minimumAmountOut ?? quote.outputAmount).toString()));
         fireToast(`Bought — ${sig.slice(0, 8)}...`, "buy");
@@ -938,6 +961,13 @@ export default function App() {
       if (coin.migrated) {
         const pool = await fetchDammPool(connection, coin.mint);
         if (!pool) throw new Error("Migrated pool not found yet — try again in a moment");
+        if (!coin.quoteMint.equals(QUOTE_MINT)) {
+          // stock pair after graduation: sell the coin for the quote token, then swap that into SOL
+          const sigSol = await sellToSolDamm(connection, walletFor(), pool, raw, Math.round(slippagePct * 100));
+          fireToast(`Sold for SOL — ${sigSol.slice(0, 8)}...`, "sell");
+          await refresh();
+          return;
+        }
         const quote = await quoteDammTrade(connection, pool, raw, true, Math.round(slippagePct * 100));
         const sig = await dammSell(connection, walletFor(), pool, raw, BigInt((quote.minimumAmountOut ?? quote.outputAmount).toString()));
         fireToast(`Sold — ${sig.slice(0, 8)}...`, "sell");
@@ -1658,7 +1688,7 @@ export default function App() {
 
         {(() => {
           const quoteToken = getQuoteTokenByMint(selected.quoteMint);
-          const viaSolPair = !selected.quoteMint.equals(QUOTE_MINT) && !selected.migrated; // stock pairs on the curve trade in SOL
+          const viaSolPair = !selected.quoteMint.equals(QUOTE_MINT); // stock pairs trade in SOL, on the curve and after graduation
           const payLabel = tab === "buy" ? (viaSolPair ? "SOL" : quoteSymbolFor(selected)) : selected.symbol;
           const receiveLabel = tab === "buy" ? selected.symbol : (viaSolPair ? "SOL" : quoteSymbolFor(selected));
           const payBalance = tab === "buy" ? walletSolBalance : walletTokenBalance;

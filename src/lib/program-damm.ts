@@ -156,6 +156,20 @@ export async function claimDammPositionFee(
   pool: DammPool,
   positionInfo: DammPosition
 ) {
+  // Stock-paired coins pay out in SOL: claim, then swap the quote-token fees through Jupiter
+  if (!pool.tokenBMint.equals(new PublicKey("So11111111111111111111111111111111111111112"))) {
+    const m = await import("./damm-sol");
+    return m.claimDammFeeAsSol(connection, wallet, pool, positionInfo);
+  }
+  return claimDammPositionFeeRaw(connection, wallet, pool, positionInfo);
+}
+
+async function claimDammPositionFeeRaw(
+  connection: Connection,
+  wallet: AnchorProvider["wallet"],
+  pool: DammPool,
+  positionInfo: DammPosition
+) {
   const client = getCpAmmClient(connection);
   const tx = await client.claimPositionFee2({
     owner: wallet.publicKey,
