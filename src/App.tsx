@@ -154,6 +154,7 @@ export default function App() {
     if (!path) return { mint: null, view: "discover" };
     const lower = path.toLowerCase();
     if (lower === "burn") return { mint: null, view: "burn" };
+    if (lower === "launch") return { mint: null, view: "create" };
     if (lower === "mq" && MQ_MINT) return { mint: MQ_MINT, view: "trade" };
     return { mint: path, view: "trade" };
   };
@@ -780,6 +781,13 @@ export default function App() {
     }
   }
 
+  function goToLaunch() {
+    setView("create");
+    if (window.location.pathname !== "/launch") {
+      window.history.pushState({}, "", "/launch");
+    }
+  }
+
   function goToDiscover() {
     setView("discover");
     if (window.location.pathname !== "/") {
@@ -1025,7 +1033,7 @@ export default function App() {
           <a className="icon-btn nav-social-desktop" aria-label="X / Twitter" href="https://x.com/Mintiqdotfun" target="_blank" rel="noopener noreferrer">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.6 8.7L23.3 22h-7l-5.5-7.2L4.5 22H1.3l8.1-9.3L1 2h7.2l5 6.6L18.9 2Z"/></svg>
           </a>
-          <button className="btn btn-primary" onClick={() => setView("create")} disabled={!wallet.publicKey}>
+          <button className="btn btn-primary" onClick={() => goToLaunch()} disabled={!wallet.publicKey}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
             Launch token
           </button>
@@ -1068,7 +1076,7 @@ export default function App() {
               <a>Revenue</a>
               <a>Documentation</a>
             </nav>
-            <button className="btn btn-primary mobile-menu-launch" onClick={() => { setView("create"); setMobileMenuOpen(false); }} disabled={!wallet.publicKey}>
+            <button className="btn btn-primary mobile-menu-launch" onClick={() => { goToLaunch(); setMobileMenuOpen(false); }} disabled={!wallet.publicKey}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
               Launch a token
             </button>
@@ -1093,7 +1101,7 @@ export default function App() {
                 <h1>Launch coins paired with anything</h1>
                 <p className="lead">Launch and discover onchain coins paired with memes, stocks, currencies, commodities, and beyond.</p>
                 <div className="hero-ctas">
-                  <button className="btn btn-primary btn-lg" onClick={() => setView("create")} disabled={!wallet.publicKey}>
+                  <button className="btn btn-primary btn-lg" onClick={() => goToLaunch()} disabled={!wallet.publicKey}>
                     Launch a token
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                   </button>

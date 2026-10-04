@@ -290,23 +290,31 @@ export default function CreateCoinPage({
             <div className="field-row-2">
               <div>
                 <label className="form-label">X / Twitter</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="https://x.com/project"
-                  value={xProfile}
-                  onChange={(e) => setXProfile(e.target.value)}
-                />
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8FA3A8", fontSize: 13, pointerEvents: "none" }}>x.com/</span>
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{ paddingLeft: 58 }}
+                    placeholder="yourhandle"
+                    value={xProfile}
+                    onChange={(e) => setXProfile(e.target.value.replace(/^(https?:\/\/)?(www\.)?(x|twitter)\.com\//i, "").replace(/[?#].*$/, "").replace(/\/+$/, "").replace(/^@/, ""))}
+                  />
+                </div>
               </div>
               <div>
                 <label className="form-label">Telegram</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="https://t.me/project"
-                  value={telegram}
-                  onChange={(e) => setTelegram(e.target.value)}
-                />
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8FA3A8", fontSize: 13, pointerEvents: "none" }}>t.me/</span>
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{ paddingLeft: 52 }}
+                    placeholder="yourhandle"
+                    value={telegram}
+                    onChange={(e) => setTelegram(e.target.value.replace(/^(https?:\/\/)?(www\.)?(t|telegram)\.me\//i, "").replace(/[?#].*$/, "").replace(/\/+$/, "").replace(/^@/, ""))}
+                  />
+                </div>
               </div>
             </div>
           </div>
