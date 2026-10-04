@@ -1012,7 +1012,7 @@ export default function App() {
         <div className="wrap nav-inner">
           <div className="brand">
             <img className="brand-icon" width="26" height="28" src={MINTI_LOGO_BASE64} alt="Minti Q" />
-            <span>Minti <span style={{ color: "var(--mint)" }}>Q</span></span>
+            <span className="brand-text">Minti <span style={{ color: "var(--mint)" }}>Q</span></span>
           </div>
           <nav className="nav-links">
             <a onClick={() => (MQ_MINT ? openCoin(MQ_MINT) : goToSection("tokens"))} style={{ cursor: "pointer" }}>$MQ</a>
@@ -1033,11 +1033,11 @@ export default function App() {
           <a className="icon-btn nav-social-desktop" aria-label="X / Twitter" href="https://x.com/Mintiqdotfun" target="_blank" rel="noopener noreferrer">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.6 8.7L23.3 22h-7l-5.5-7.2L4.5 22H1.3l8.1-9.3L1 2h7.2l5 6.6L18.9 2Z"/></svg>
           </a>
-          <button className="btn btn-primary" onClick={() => goToLaunch()} disabled={!wallet.publicKey}>
+          <button className="btn btn-primary nav-launch" onClick={() => goToLaunch()} disabled={!wallet.publicKey}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            Launch token
+            <span className="nav-launch-text">Launch<span className="nav-launch-extra"> token</span></span>
           </button>
-          <button className="btn btn-outline" onClick={() => (wallet.publicKey ? wallet.disconnect() : walletModal.setVisible(true))}>
+          <button id="navConnectDesktop" className="btn btn-outline" onClick={() => (wallet.publicKey ? wallet.disconnect() : walletModal.setVisible(true))}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="6" width="20" height="14" rx="2.5"/><path d="M16 13h.01M2 10h20"/></svg>
             {wallet.publicKey ? short(wallet.publicKey.toBase58()) : "Connect wallet"}
           </button>

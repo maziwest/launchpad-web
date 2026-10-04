@@ -377,3 +377,19 @@
   @media (max-width: 560px){
     .nav-inner{height:64px;}
   }
+
+
+/* Mobile header: logo, Launch, search, menu and Connect must all stay on screen */
+@media (max-width: 900px) {
+  .nav-launch { padding: 9px 12px; white-space: nowrap; }
+}
+@media (max-width: 560px) {
+  .nav-launch-extra { display: none; }
+}
+@media (max-width: 440px) {
+  .brand-text { display: none; }
+}
+@media (max-width: 360px) {
+  .nav-launch-text { display: none; }
+  .nav-launch { padding: 9px 11px; }
+}
