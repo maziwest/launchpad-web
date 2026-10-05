@@ -494,7 +494,7 @@ export default function App() {
       cancelled = true;
       window.clearInterval(coinId);
     };
-  }, [view, selectedMint, connection, activityTick]);
+  }, [view, selectedMint, connection]); // activityTick removed: re-reading the chain on every trade made RPC cost grow with viewers x trades
 
   const selectedListCoin = coins.find((c) => c.mint.toBase58() === selectedMint);
   // Live chain data lacks backend-only fields (quote USD price, 24h volume, verified); keep them from the coin list
