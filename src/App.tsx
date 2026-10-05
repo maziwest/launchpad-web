@@ -419,6 +419,7 @@ export default function App() {
   useEffect(() => {
     if (view !== "discover") return;
     const interval = setInterval(() => {
+      if (document.hidden) return;
       fetchAllCoinsFromApi()
         .catch((err) => {
           console.error("Backend API unreachable, falling back to direct chain fetch:", err);
@@ -488,7 +489,7 @@ export default function App() {
       }
     };
     loadCoin(true);
-    const coinId = window.setInterval(() => loadCoin(false), 30000);
+    const coinId = window.setInterval(() => { if (!document.hidden) loadCoin(false); }, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(coinId);
