@@ -79,6 +79,18 @@ export const QUOTE_TOKEN_OPTIONS: QuoteTokenOption[] = [
       imageUrl: "https://backpack.exchange/api/stock-logo/DKNG",
     },
   ] : []) as QuoteTokenOption[]),
+  // Ferrari (Sunrise). Mainnet only. 6 decimals, Meteora token badges.
+  ...((IS_MAINNET ? [
+    {
+      mint: new PublicKey("RACEyWiM2ztEZcJx2AHXU2eWjhxU57x3vXn92b39dLD"),
+      configKey: new PublicKey("6QhYXbLF98SCXVdR6yYhf1ERYwvyfpBcFbZjrp8KuTEu"),
+      symbol: "RACE",
+      displayName: "Ferrari",
+      decimals: 6,
+      category: "Sunrise",
+      imageUrl: "https://backpack.exchange/api/stock-logo/RACE",
+    },
+  ] : []) as QuoteTokenOption[]),
   // Devnet-only test quote token; never shown on mainnet
   ...((IS_MAINNET ? [] : [
     {
