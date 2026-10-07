@@ -3,6 +3,7 @@ import { MQ_MINT, EXPLORER_SUFFIX, API_BASE_URL } from "./lib/network";
 import MqBurnCard from "./MqBurnCard";
 import { buyWithSolDamm, sellToSolDamm } from "./lib/damm-sol";
 import BurnPage from "./BurnPage";
+import RevenuePage from "./RevenuePage";
 import { PAIR_CATEGORIES } from "./lib/quote-tokens";
 import { fetchTradesFromApi, fetchClaimsFromApi } from "./lib/program-dbc";
 import React, { useCallback, useEffect, useState } from "react";
@@ -150,11 +151,12 @@ export default function App() {
   // different components entirely, so any other non-root path here is
   // always a potential mint address, never one of those reserved routes.
   // Reserved paths: /burn opens Burn, /mq opens the official $MQ token; any other non-root path is a coin mint
-  const routeFromPath = (raw: string): { mint: string | null; view: "discover" | "trade" | "create" | "burn" } => {
+  const routeFromPath = (raw: string): { mint: string | null; view: "discover" | "trade" | "create" | "burn" | "revenue" } => {
     const path = raw.replace(/^\/+|\/+$/g, "");
     if (!path) return { mint: null, view: "discover" };
     const lower = path.toLowerCase();
     if (lower === "burn") return { mint: null, view: "burn" };
+    if (lower === "revenue") return { mint: null, view: "revenue" };
     if (lower === "launch") return { mint: null, view: "create" };
     if (lower === "mq" && MQ_MINT) return { mint: MQ_MINT, view: "trade" };
     return { mint: path, view: "trade" };
@@ -162,7 +164,7 @@ export default function App() {
   const initialRoute = routeFromPath(window.location.pathname);
   const initialPathMint = initialRoute.mint;
   const [selectedMint, setSelectedMint] = useState<string | null>(initialRoute.mint);
-  const [view, setView] = useState<"discover" | "trade" | "create" | "burn">(initialRoute.view);
+  const [view, setView] = useState<"discover" | "trade" | "create" | "burn" | "revenue">(initialRoute.view);
 
   // Browser back/forward should navigate too, not just our own buttons.
   useEffect(() => {
@@ -805,6 +807,13 @@ export default function App() {
     }
   }
 
+  function goToRevenue() {
+    setView("revenue");
+    if (window.location.pathname !== "/revenue") {
+      window.history.pushState({}, "", "/revenue");
+    }
+  }
+
   function goToLaunch() {
     setView("create");
     if (window.location.pathname !== "/launch") {
@@ -1062,8 +1071,8 @@ export default function App() {
           <nav className="nav-links">
             <a onClick={() => (MQ_MINT ? openCoin(MQ_MINT) : goToSection("tokens"))} style={{ cursor: "pointer" }}>$MQ</a>
             <a style={{ cursor: "pointer" }} onClick={() => goToBurn()}>Burn</a>
+            <a style={{ cursor: "pointer" }} onClick={() => goToRevenue()}>Revenue</a>
             <a>Royalties</a>
-            <a>Revenue</a>
             <a>Documentation</a>
           </nav>
           <div className="nav-spacer"></div>
@@ -1117,8 +1126,8 @@ export default function App() {
             <nav className="mobile-menu-links">
               <a onClick={() => { if (MQ_MINT) openCoin(MQ_MINT); else goToSection("tokens"); setMobileMenuOpen(false); }} style={{ cursor: "pointer" }}>$MQ</a>
               <a style={{ cursor: "pointer" }} onClick={() => { goToBurn(); setMobileMenuOpen(false); }}>Burn</a>
+              <a style={{ cursor: "pointer" }} onClick={() => { goToRevenue(); setMobileMenuOpen(false); }}>Revenue</a>
               <a>Royalties</a>
-              <a>Revenue</a>
               <a>Documentation</a>
             </nav>
             <button className="btn btn-primary mobile-menu-launch" onClick={() => { goToLaunch(); setMobileMenuOpen(false); }} disabled={!wallet.publicKey}>
@@ -2049,6 +2058,7 @@ export default function App() {
       )}
 
       {view === "burn" && <BurnPage />}
+      {view === "revenue" && <RevenuePage />}
       {view === "create" && (
         <CreateCoinPage
           onBack={() => goToDiscover()}
