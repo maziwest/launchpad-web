@@ -204,7 +204,7 @@ export default function RevenuePage() {
 
         <p style={{ fontSize: 12, color: "#8FA3A8", lineHeight: 1.6, margin: "14px 0 6px" }}>
           Fees are counted on the day they are claimed, so the line rises in steps. Fees still waiting to be claimed are not
-          included. SOL amounts for coins paired with other tokens use today's price, so they are approximate. These figures are
+          included, and fees claimed from graduated pools are not counted yet. SOL amounts for coins paired with other tokens use today's price, so they are approximate. These figures are
           earnings before costs, and they include trades made by the team while testing.
         </p>
       </div>

@@ -4,6 +4,7 @@ import MqBurnCard from "./MqBurnCard";
 import { buyWithSolDamm, sellToSolDamm } from "./lib/damm-sol";
 import BurnPage from "./BurnPage";
 import RevenuePage from "./RevenuePage";
+import DocsPage from "./DocsPage";
 import { PAIR_CATEGORIES } from "./lib/quote-tokens";
 import { fetchTradesFromApi, fetchClaimsFromApi } from "./lib/program-dbc";
 import React, { useCallback, useEffect, useState } from "react";
@@ -151,12 +152,13 @@ export default function App() {
   // different components entirely, so any other non-root path here is
   // always a potential mint address, never one of those reserved routes.
   // Reserved paths: /burn opens Burn, /mq opens the official $MQ token; any other non-root path is a coin mint
-  const routeFromPath = (raw: string): { mint: string | null; view: "discover" | "trade" | "create" | "burn" | "revenue" } => {
+  const routeFromPath = (raw: string): { mint: string | null; view: "discover" | "trade" | "create" | "burn" | "revenue" | "docs" } => {
     const path = raw.replace(/^\/+|\/+$/g, "");
     if (!path) return { mint: null, view: "discover" };
     const lower = path.toLowerCase();
     if (lower === "burn") return { mint: null, view: "burn" };
     if (lower === "revenue") return { mint: null, view: "revenue" };
+    if (lower === "docs" || lower.startsWith("docs/")) return { mint: null, view: "docs" };
     if (lower === "launch") return { mint: null, view: "create" };
     if (lower === "mq" && MQ_MINT) return { mint: MQ_MINT, view: "trade" };
     return { mint: path, view: "trade" };
@@ -164,7 +166,7 @@ export default function App() {
   const initialRoute = routeFromPath(window.location.pathname);
   const initialPathMint = initialRoute.mint;
   const [selectedMint, setSelectedMint] = useState<string | null>(initialRoute.mint);
-  const [view, setView] = useState<"discover" | "trade" | "create" | "burn" | "revenue">(initialRoute.view);
+  const [view, setView] = useState<"discover" | "trade" | "create" | "burn" | "revenue" | "docs">(initialRoute.view);
 
   // Browser back/forward should navigate too, not just our own buttons.
   useEffect(() => {
@@ -814,6 +816,13 @@ export default function App() {
     }
   }
 
+  function goToDocs() {
+    setView("docs");
+    if (window.location.pathname !== "/docs") {
+      window.history.pushState({}, "", "/docs");
+    }
+  }
+
   function goToLaunch() {
     setView("create");
     if (window.location.pathname !== "/launch") {
@@ -1073,7 +1082,7 @@ export default function App() {
             <a style={{ cursor: "pointer" }} onClick={() => goToBurn()}>Burn</a>
             <a style={{ cursor: "pointer" }} onClick={() => goToRevenue()}>Revenue</a>
             <a>Royalties</a>
-            <a>Documentation</a>
+            <a style={{ cursor: "pointer" }} onClick={() => goToDocs()}>Documentation</a>
           </nav>
           <div className="nav-spacer"></div>
           <div className="search-box">
@@ -1128,7 +1137,7 @@ export default function App() {
               <a style={{ cursor: "pointer" }} onClick={() => { goToBurn(); setMobileMenuOpen(false); }}>Burn</a>
               <a style={{ cursor: "pointer" }} onClick={() => { goToRevenue(); setMobileMenuOpen(false); }}>Revenue</a>
               <a>Royalties</a>
-              <a>Documentation</a>
+              <a style={{ cursor: "pointer" }} onClick={() => { goToDocs(); setMobileMenuOpen(false); }}>Documentation</a>
             </nav>
             <button className="btn btn-primary mobile-menu-launch" onClick={() => { goToLaunch(); setMobileMenuOpen(false); }} disabled={!wallet.publicKey}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
@@ -1427,7 +1436,7 @@ export default function App() {
                 Minti Q — mint free, trade free, Solana.
               </div>
               <div className="footer-links">
-                <a>Documentation</a>
+                <a style={{ cursor: "pointer" }} onClick={() => goToDocs()}>Documentation</a>
                 <a href="https://x.com/Mintiqdotfun" target="_blank" rel="noopener noreferrer">X</a>
                 <a href="https://t.me/mintiqdotfun" target="_blank" rel="noopener noreferrer">Telegram</a>
                 <a>Terms of Service</a>
@@ -1941,7 +1950,7 @@ export default function App() {
                   onClick={() => handleClaimDamm(selected)}
                   disabled={loading}
                 >
-                  {loading ? "..." : "Claim DAMM v2 fees"}
+                  {loading ? "..." : "Claim pool fees"}
                 </button>
               )}
             </>
@@ -2059,6 +2068,7 @@ export default function App() {
 
       {view === "burn" && <BurnPage />}
       {view === "revenue" && <RevenuePage />}
+      {view === "docs" && <DocsPage />}
       {view === "create" && (
         <CreateCoinPage
           onBack={() => goToDiscover()}
